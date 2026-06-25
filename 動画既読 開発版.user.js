@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版v3.3.2
+// @name         動画既読 開発版v3.3.3
 // @namespace    https://missav.ai/
-// @version      3.3.2
+// @version      3.3.3
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
