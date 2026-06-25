@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 安定版v3.2
+// @name         動画既読 安定版v3.4.0
 // @namespace    https://missav.ai/
-// @version      3.2
+// @version      3.4.0
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -216,7 +216,10 @@
         box-shadow: 0 2px 8px rgba(0,0,0,.1);
         max-height: 40vh;
         overflow-y: auto;
-        width: 350px;
+        width: min(350px, calc(100vw - 32px));
+        box-sizing: border-box;
+        touch-action: auto !important;
+        -webkit-overflow-scrolling: touch !important;
         padding: 8px;
         margin-top: 8px;
       }
@@ -244,6 +247,54 @@
         background: #fff !important;
         border: 1px solid #ccc !important;
         box-shadow: none !important;
+      }
+
+      @media (max-width: 767px) {
+        #missav-rf-controls {
+          align-items: flex-end;
+          left: 16px !important;
+          right: 16px !important;
+          justify-content: flex-end;
+          max-width: calc(100vw - 32px);
+        }
+
+        #missav-rf-button-group {
+          width: auto;
+          align-items: flex-end;
+        }
+
+        #missav-rf-video-list-container {
+          width: calc((100vw - 32px) * 0.72);
+          max-width: calc((100vw - 32px) * 0.72);
+          align-self: flex-end;
+          transform: translateX(10%);
+        }
+
+        #missav-rf-video-list-controls {
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        #missav-rf-video-list-controls input,
+        #missav-rf-video-list-controls button {
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .missav-rf-video-list-item {
+          flex-direction: row;
+          align-items: center;
+          gap: 4px;
+          min-height: 36px;
+        }
+
+        .missav-rf-video-list-item span {
+          width: auto;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
       }
 
       #missav-rf-video-list-controls button[data-active="true"] {
