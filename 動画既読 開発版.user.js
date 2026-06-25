@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版v3.3.4
+// @name         動画既読 開発版v3.3.5
 // @namespace    https://missav.ai/
-// @version      3.3.4
+// @version      3.3.5
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -264,8 +264,9 @@
         }
 
         #missav-rf-video-list-container {
-          width: 100%;
-          max-width: none;
+          width: min(320px, calc(100vw - 32px));
+          max-width: 320px;
+          align-self: flex-end;
         }
 
         #missav-rf-video-list-controls {
