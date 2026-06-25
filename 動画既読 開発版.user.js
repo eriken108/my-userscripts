@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版v3.3.3
+// @name         動画既読 開発版v3.3.4
 // @namespace    https://missav.ai/
-// @version      3.3.3
+// @version      3.3.4
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -250,6 +250,15 @@
       }
 
       @media (max-width: 767px) {
+        #missav-rf-controls {
+          flex-direction: column;
+          align-items: flex-end;
+        }
+
+        #missav-rf-controls > div {
+          width: 100%;
+        }
+
         #missav-rf-video-list-container {
           width: calc(100vw - 24px);
           max-width: 320px;
@@ -274,6 +283,35 @@
 
         .missav-rf-video-list-item span {
           width: 100%;
+        }
+
+        #missav-rf-button-group {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+          justify-content: flex-start;
+        }
+
+        #missav-rf-button-group > [data-kind="stats"],
+        #missav-rf-button-group > textarea {
+          flex: 1 1 100%;
+        }
+
+        #missav-rf-button-group > button {
+          flex: 1 1 auto;
+          min-width: 90px;
+        }
+
+        #missav-rf-button-group > button[data-kind="settings"] {
+          flex: 1 1 100%;
+        }
+
+        #missav-rf-button-group > button[data-kind="export"],
+        #missav-rf-button-group > button[data-kind="import"],
+        #missav-rf-button-group > button[data-kind="clear"] {
+          flex: 1 1 calc(33.33% - 8px);
+          min-width: 90px;
         }
       }
 
