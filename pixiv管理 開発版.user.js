@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v1.5
+// @name         Pixiv管理 開発版v1.6
 // @namespace    https://example.com/userscripts
-// @version      1.5
+// @version      1.6
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -61,53 +61,91 @@
                 right: 16px;
                 bottom: 16px;
                 z-index: 2147483647;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
                 font-family: Arial, sans-serif;
                 font-size: 12px;
-                color: #222;
+                color: #111827;
+                pointer-events: none;
+            }
+            #pixiv-follow-gray-toggle-btn,
+            #pixiv-follow-gray-panel {
+                pointer-events: auto;
             }
             #pixiv-follow-gray-toggle-btn {
-                width: 42px;
-                height: 42px;
-                border: none;
+                width: 48px;
+                height: 48px;
+                border: 2px solid rgba(255,255,255,0.95);
                 border-radius: 50%;
-                background: #fff;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                color: #ffffff;
+                box-shadow: 0 6px 16px rgba(0,0,0,0.25);
                 cursor: pointer;
-                font-size: 20px;
+                font-size: 22px;
+                font-weight: 700;
+                line-height: 1;
             }
             #pixiv-follow-gray-panel {
                 display: none;
-                width: 300px;
-                margin-top: 8px;
-                padding: 12px;
-                border-radius: 10px;
-                background: rgba(255,255,255,0.96);
-                box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+                width: 320px;
+                max-width: calc(100vw - 32px);
+                margin-top: 2px;
+                padding: 14px;
+                border: 1px solid rgba(37, 99, 235, 0.18);
+                border-radius: 12px;
+                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
+                color: #111827;
             }
             #pixiv-follow-gray-panel.open {
                 display: block;
             }
+            #pixiv-follow-gray-panel .panel-title {
+                font-size: 13px;
+                font-weight: 700;
+                color: #0f172a;
+                margin-bottom: 8px;
+            }
             #pixiv-follow-gray-panel textarea {
                 width: 100%;
-                min-height: 100px;
+                min-height: 110px;
                 margin-top: 6px;
                 resize: vertical;
                 box-sizing: border-box;
-                padding: 6px;
+                padding: 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                background: #ffffff;
+                color: #111827;
+                font-size: 12px;
+                line-height: 1.4;
             }
             #pixiv-follow-gray-panel button {
                 margin-top: 8px;
                 margin-right: 8px;
-                padding: 6px 10px;
-                border: 1px solid #ccc;
-                border-radius: 6px;
-                background: #f5f5f5;
+                padding: 7px 11px;
+                border: 1px solid #2563eb;
+                border-radius: 8px;
+                background: #2563eb;
+                color: #ffffff;
                 cursor: pointer;
+                font-weight: 600;
+            }
+            #pixiv-follow-gray-panel button:hover {
+                background: #1d4ed8;
             }
             #pixiv-follow-gray-panel label,
             #pixiv-follow-gray-panel .count-label {
                 display: block;
                 margin-top: 6px;
+                color: #334155;
+                font-weight: 600;
+            }
+            #pixiv-follow-gray-panel input[type="checkbox"] {
+                accent-color: #2563eb;
+                transform: translateY(1px);
             }
         `;
         document.head.appendChild(style);
@@ -127,7 +165,7 @@
         const panel = document.createElement('div');
         panel.id = 'pixiv-follow-gray-panel';
         panel.innerHTML = `
-            <div><strong>Pixiv 管理</strong></div>
+            <div class="panel-title">Pixiv 管理</div>
             <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
             <div class="count-label" id="pixiv-follow-gray-count">適用中ユーザー数: 0人</div>
             <textarea id="pixiv-follow-gray-user-list" placeholder="ユーザーIDやURLを1行ごとに入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
