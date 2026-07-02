@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         pixiv管理 開発版v1.1
+// @name         pixiv管理 開発版v1.2
 // @namespace    https://www.pixiv.net/
-// @version      1.1
+// @version      1.2
 // @description  Grays out thumbnails from followed users on pixiv lists and cards.
 // @match        https://www.pixiv.net/*
 // @grant        GM_getValue
@@ -159,6 +159,21 @@
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
           cursor: pointer;
         }
+        .pixiv-follow-gray-settings-count {
+          position: fixed;
+          right: 16px;
+          bottom: 54px;
+          z-index: 2147483647;
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(30, 143, 255, 0.95);
+          color: white;
+          font-size: 11px;
+          font-weight: 700;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+          white-space: nowrap;
+          pointer-events: none;
+        }
         .pixiv-follow-gray-settings-panel {
           position: fixed;
           right: 16px;
@@ -204,6 +219,10 @@
     button.type = 'button';
     button.className = 'pixiv-follow-gray-settings-btn';
     button.textContent = '設定';
+
+    const countBadge = document.createElement('div');
+    countBadge.className = 'pixiv-follow-gray-settings-count';
+    countBadge.textContent = 'フォロー数: -';
     button.addEventListener('click', () => {
       if (!state.ui || !state.ui.panel) {
         return;
@@ -257,12 +276,14 @@
       });
     });
 
+    document.body.appendChild(countBadge);
     document.body.appendChild(button);
     document.body.appendChild(panel);
 
     state.ui = {
       button,
       panel,
+      countBadge,
       grayscaleInput: panel.querySelector('input[data-setting="grayscale"]'),
       opacityInput: panel.querySelector('input[data-setting="opacity"]'),
       borderInput: panel.querySelector('input[data-setting="enableBorder"]'),
@@ -277,6 +298,14 @@
       return;
     }
     createSettingsUi();
+  }
+
+  function updateFollowCountBadge() {
+    if (!state.ui || !state.ui.countBadge) {
+      return;
+    }
+    const size = state.followIds ? state.followIds.size : 0;
+    state.ui.countBadge.textContent = `フォロー数: ${size}`;
   }
 
   function parseNumericId(value) {
@@ -560,6 +589,7 @@
         state.followIds = new Set(cached.ids);
         state.followIdsLoaded = true;
         state.followIdsUpdatedAt = cached.timestamp;
+        updateFollowCountBadge();
         logDebug('follow cache hit', state.followIds.size);
         return state.followIds;
       }
@@ -569,6 +599,7 @@
         state.followIds = new Set();
         state.followIdsLoaded = true;
         state.followIdsUpdatedAt = now;
+        updateFollowCountBadge();
         logDebug('no current user id', null);
         return state.followIds;
       }
@@ -602,6 +633,7 @@
       state.followIds = followIds;
       state.followIdsLoaded = true;
       state.followIdsUpdatedAt = now;
+      updateFollowCountBadge();
       storage.set('pixivFollowGrayFollowIds', {
         ids: Array.from(followIds),
         timestamp: now
