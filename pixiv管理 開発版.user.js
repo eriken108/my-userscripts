@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         pixiv管理 開発版
+// @name         pixiv管理 開発版v1.1
 // @namespace    https://www.pixiv.net/
 // @version      1.1
 // @description  Grays out thumbnails from followed users on pixiv lists and cards.
