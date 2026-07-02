@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v1.7
+// @name         Pixiv管理 開発版v1.8
 // @namespace    https://example.com/userscripts
-// @version      1.7
+// @version      1.8
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -53,8 +53,14 @@
                 filter: grayscale(1) !important;
                 opacity: 0.6 !important;
             }
-            .pixiv-follow-gray-target img {
+            .pixiv-follow-gray-target img,
+            .pixiv-follow-gray-target video,
+            .pixiv-follow-gray-target picture,
+            .pixiv-follow-gray-target canvas {
                 filter: grayscale(1) !important;
+            }
+            .pixiv-follow-gray-target * {
+                color: inherit !important;
             }
             #pixiv-follow-gray-settings {
                 position: fixed;
@@ -299,17 +305,12 @@
             const userId = getUserIdFromElement(node);
             if (!userId || !targets.has(userId)) return;
             matchedCount += 1;
-
-            const container = node.closest('li, article, div, section') || node;
-            container.classList.add('pixiv-follow-gray-target');
-            container.querySelectorAll('img, video, canvas').forEach((media) => {
-                media.classList.add('pixiv-follow-gray-target');
-            });
-
             node.classList.add('pixiv-follow-gray-target');
-            const images = node.querySelectorAll('img');
-            images.forEach((img) => img.classList.add('pixiv-follow-gray-target'));
-            if (node.tagName === 'IMG') {
+
+            const media = node.querySelectorAll('img, video, picture, canvas');
+            media.forEach((el) => el.classList.add('pixiv-follow-gray-target'));
+
+            if (node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'PICTURE' || node.tagName === 'CANVAS') {
                 node.classList.add('pixiv-follow-gray-target');
             }
         });
