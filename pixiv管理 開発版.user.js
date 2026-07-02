@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pixiv管理 開発版
 // @namespace    https://www.pixiv.net/
-// @version      1.0
+// @version      1.1
 // @description  Grays out thumbnails from followed users on pixiv lists and cards.
 // @match        https://www.pixiv.net/*
 // @grant        GM_getValue
@@ -30,7 +30,8 @@
     followIdsLoading: null,
     followIdsUpdatedAt: 0,
     scheduled: false,
-    observer: null
+    observer: null,
+    ui: null
   };
 
   const storage = {
@@ -83,65 +84,199 @@
     }
   }
 
-  function registerMenuCommands() {
-    if (typeof GM_registerMenuCommand !== 'function') {
+  function applySettingsToUi() {
+    if (!state.ui || !state.ui.panel) {
+      return;
+    }
+    const { grayscaleInput, opacityInput, borderInput, borderColorInput, debugInput } = state.ui;
+    if (grayscaleInput) {
+      grayscaleInput.value = String(settings.grayscale);
+    }
+    if (opacityInput) {
+      opacityInput.value = String(settings.opacity);
+    }
+    if (borderInput) {
+      borderInput.checked = Boolean(settings.enableBorder);
+    }
+    if (borderColorInput) {
+      borderColorInput.value = settings.borderColor || '#888888';
+    }
+    if (debugInput) {
+      debugInput.checked = Boolean(settings.debug);
+    }
+  }
+
+  function updateSettingsFromUi() {
+    if (!state.ui) {
+      return;
+    }
+    const { grayscaleInput, opacityInput, borderInput, borderColorInput, debugInput } = state.ui;
+    if (grayscaleInput) {
+      const parsed = parseInt(grayscaleInput.value, 10);
+      if (!Number.isNaN(parsed)) {
+        settings.grayscale = Math.max(0, Math.min(100, parsed));
+      }
+    }
+    if (opacityInput) {
+      const parsed = parseFloat(opacityInput.value);
+      if (!Number.isNaN(parsed)) {
+        settings.opacity = Math.max(0, Math.min(1, parsed));
+      }
+    }
+    if (borderInput) {
+      settings.enableBorder = Boolean(borderInput.checked);
+    }
+    if (borderColorInput) {
+      settings.borderColor = borderColorInput.value || '#888888';
+    }
+    if (debugInput) {
+      settings.debug = Boolean(debugInput.checked);
+    }
+    saveSettings();
+    applySettingsToUi();
+    reprocessAll();
+  }
+
+  function createSettingsUi() {
+    if (state.ui && state.ui.button) {
       return;
     }
 
-    GM_registerMenuCommand('pixiv follow gray: set grayscale', () => {
-      const value = prompt('グレースケール量 (0-100)', String(settings.grayscale));
-      if (value === null) {
+    if (typeof GM_addStyle === 'function') {
+      GM_addStyle(`
+        .pixiv-follow-gray-settings-btn {
+          position: fixed;
+          right: 16px;
+          bottom: 16px;
+          z-index: 2147483647;
+          border: 1px solid rgba(0, 0, 0, 0.2);
+          border-radius: 999px;
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.95);
+          color: #222;
+          font-size: 13px;
+          font-weight: 600;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+          cursor: pointer;
+        }
+        .pixiv-follow-gray-settings-panel {
+          position: fixed;
+          right: 16px;
+          bottom: 58px;
+          z-index: 2147483647;
+          width: min(320px, calc(100vw - 24px));
+          padding: 12px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.97);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+          font-size: 13px;
+          color: #222;
+        }
+        .pixiv-follow-gray-settings-panel label {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin: 6px 0;
+        }
+        .pixiv-follow-gray-settings-panel input[type="range"],
+        .pixiv-follow-gray-settings-panel input[type="color"],
+        .pixiv-follow-gray-settings-panel input[type="checkbox"] {
+          accent-color: #1e8fff;
+        }
+        .pixiv-follow-gray-settings-panel .pixiv-follow-gray-settings-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 10px;
+          flex-wrap: wrap;
+        }
+        .pixiv-follow-gray-settings-panel button {
+          border: 1px solid #d0d0d0;
+          border-radius: 6px;
+          background: #f7f7f7;
+          padding: 6px 8px;
+          cursor: pointer;
+        }
+      `);
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pixiv-follow-gray-settings-btn';
+    button.textContent = '設定';
+    button.addEventListener('click', () => {
+      if (!state.ui || !state.ui.panel) {
         return;
       }
-      const numberValue = parseInt(value, 10);
-      if (!Number.isNaN(numberValue)) {
-        settings.grayscale = Math.max(0, Math.min(100, numberValue));
-        saveSettings();
-        reprocessAll();
+      state.ui.panel.hidden = !state.ui.panel.hidden;
+      if (!state.ui.panel.hidden) {
+        applySettingsToUi();
       }
     });
 
-    GM_registerMenuCommand('pixiv follow gray: set opacity', () => {
-      const value = prompt('透明度 (0.0-1.0)', String(settings.opacity));
-      if (value === null) {
-        return;
-      }
-      const numberValue = parseFloat(value);
-      if (!Number.isNaN(numberValue)) {
-        settings.opacity = Math.max(0, Math.min(1, numberValue));
-        saveSettings();
-        reprocessAll();
-      }
+    const panel = document.createElement('div');
+    panel.className = 'pixiv-follow-gray-settings-panel';
+    panel.hidden = true;
+    panel.innerHTML = `
+      <div style="font-weight:700; margin-bottom:8px;">pixiv follow gray</div>
+      <label>グレースケール <input type="range" min="0" max="100" step="1" data-setting="grayscale"></label>
+      <label>透明度 <input type="range" min="0" max="1" step="0.01" data-setting="opacity"></label>
+      <label><span>枠線</span> <input type="checkbox" data-setting="enableBorder"></label>
+      <label>枠線色 <input type="color" data-setting="borderColor"></label>
+      <label><span>デバッグ</span> <input type="checkbox" data-setting="debug"></label>
+      <div class="pixiv-follow-gray-settings-actions">
+        <button type="button" data-action="refresh">再読込</button>
+        <button type="button" data-action="reset">リセット</button>
+        <button type="button" data-action="close">閉じる</button>
+      </div>
+    `;
+
+    panel.querySelectorAll('input[data-setting]').forEach((input) => {
+      input.addEventListener('input', updateSettingsFromUi);
+      input.addEventListener('change', updateSettingsFromUi);
     });
 
-    GM_registerMenuCommand('pixiv follow gray: toggle border', () => {
-      settings.enableBorder = !settings.enableBorder;
-      saveSettings();
-      reprocessAll();
+    panel.querySelectorAll('button[data-action]').forEach((buttonElement) => {
+      buttonElement.addEventListener('click', () => {
+        const action = buttonElement.getAttribute('data-action');
+        if (action === 'refresh') {
+          state.followIds = null;
+          state.followIdsLoaded = false;
+          state.followIdsLoading = null;
+          state.followIdsUpdatedAt = 0;
+          saveSettings();
+          void processDocument();
+        } else if (action === 'reset') {
+          Object.assign(settings, DEFAULTS);
+          saveSettings();
+          applySettingsToUi();
+          reprocessAll();
+        } else if (action === 'close') {
+          panel.hidden = true;
+        }
+      });
     });
 
-    GM_registerMenuCommand('pixiv follow gray: set border color', () => {
-      const value = prompt('枠線色', settings.borderColor || '#888888');
-      if (value === null) {
-        return;
-      }
-      settings.borderColor = value;
-      saveSettings();
-      reprocessAll();
-    });
+    document.body.appendChild(button);
+    document.body.appendChild(panel);
 
-    GM_registerMenuCommand('pixiv follow gray: toggle debug', () => {
-      settings.debug = !settings.debug;
-      saveSettings();
-      logDebug('debug toggled', settings.debug);
-      reprocessAll();
-    });
+    state.ui = {
+      button,
+      panel,
+      grayscaleInput: panel.querySelector('input[data-setting="grayscale"]'),
+      opacityInput: panel.querySelector('input[data-setting="opacity"]'),
+      borderInput: panel.querySelector('input[data-setting="enableBorder"]'),
+      borderColorInput: panel.querySelector('input[data-setting="borderColor"]'),
+      debugInput: panel.querySelector('input[data-setting="debug"]')
+    };
+    applySettingsToUi();
+  }
 
-    GM_registerMenuCommand('pixiv follow gray: reset', () => {
-      Object.assign(settings, DEFAULTS);
-      saveSettings();
-      reprocessAll();
-    });
+  function ensureSettingsUi() {
+    if (!document.body) {
+      return;
+    }
+    createSettingsUi();
   }
 
   function parseNumericId(value) {
@@ -562,7 +697,7 @@
     if (!/^https:\/\/www\.pixiv\.net\//.test(location.href)) {
       return;
     }
-    registerMenuCommands();
+    ensureSettingsUi();
     patchHistoryApis();
     startObserver();
     if (typeof GM_addStyle === 'function') {
