@@ -1,381 +1,289 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v1.4
-// @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  Pixivでフォロー済みの作者のサムネイルをCSSフィルターでグレー表示する
-// @author       あなたの名前
+// @name         Pixiv管理 開発版v1.5
+// @namespace    https://example.com/userscripts
+// @version      1.5
+// @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
-// @grant        GM_xmlhttpRequest
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_addStyle
+// @match        https://pixiv.net/*
+// @grant        none
 // @run-at       document-idle
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    const STORAGE_KEYS = {
-        enabled: 'pixivGrayEnabled',
-        refreshInterval: 'pixivRefreshInterval',
-        showBadge: 'pixivShowBadge',
-        followedList: 'pixivFollowedList'
-    };
+    const STORAGE_KEY = 'pixiv_follow_gray_users_v1';
+    const DEFAULT_STATE = { enabled: true, users: [] };
+    let state = loadState();
+    let observer = null;
+    let scheduled = false;
 
-    const DEFAULT_SETTINGS = {
-        enabled: true,
-        refreshInterval: 5,
-        showBadge: true
-    };
+    injectStyles();
+    createSettingsUI();
+    bindEvents();
+    applyGrayStyle();
+    startObserver();
 
-    let settings = {
-        enabled: getStoredBoolean(STORAGE_KEYS.enabled, DEFAULT_SETTINGS.enabled),
-        refreshInterval: getStoredNumber(STORAGE_KEYS.refreshInterval, DEFAULT_SETTINGS.refreshInterval),
-        showBadge: getStoredBoolean(STORAGE_KEYS.showBadge, DEFAULT_SETTINGS.showBadge)
-    };
+    window.addEventListener('load', () => applyGrayStyle());
 
-    let followedSet = new Set();
-    let refreshTimer = null;
-    let ui = null;
-
-    GM_addStyle(`
-        .pixiv-followed-gray {
-            filter: grayscale(100%) !important;
-        }
-        #pixiv-admin-floating {
-            position: fixed;
-            right: 18px;
-            bottom: 18px;
-            z-index: 2147483647;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        #pixiv-admin-toggle {
-            width: 46px;
-            height: 46px;
-            border: none;
-            border-radius: 50%;
-            background: #ffffff;
-            color: #222;
-            cursor: pointer;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-        }
-        #pixiv-admin-badge {
-            position: absolute;
-            top: -6px;
-            right: -4px;
-            min-width: 20px;
-            height: 20px;
-            border-radius: 999px;
-            background: #ff5a5f;
-            color: white;
-            font-size: 12px;
-            font-weight: 700;
-            padding: 0 6px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-        #pixiv-admin-panel {
-            position: absolute;
-            right: 0;
-            bottom: 58px;
-            width: 250px;
-            padding: 12px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.97);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            display: none;
-            color: #222;
-        }
-        #pixiv-admin-panel.open {
-            display: block;
-        }
-        #pixiv-admin-panel h4 {
-            margin: 0 0 8px;
-            font-size: 14px;
-        }
-        .pixiv-admin-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 13px;
-            gap: 8px;
-        }
-        .pixiv-admin-row label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-        }
-        .pixiv-admin-row select {
-            border: 1px solid #d0d0d0;
-            border-radius: 6px;
-            padding: 4px 6px;
-            font-size: 12px;
-        }
-        .pixiv-admin-hint {
-            margin-top: 8px;
-            font-size: 11px;
-            opacity: 0.75;
-        }
-    `);
-
-    function getStoredBoolean(key, fallback) {
-        const value = GM_getValue(key, fallback);
-        return value === true || value === 'true';
-    }
-
-    function getStoredNumber(key, fallback) {
-        const value = Number(GM_getValue(key, fallback));
-        return Number.isFinite(value) ? value : fallback;
-    }
-
-    function saveSettings() {
-        GM_setValue(STORAGE_KEYS.enabled, settings.enabled);
-        GM_setValue(STORAGE_KEYS.refreshInterval, settings.refreshInterval);
-        GM_setValue(STORAGE_KEYS.showBadge, settings.showBadge);
-    }
-
-    function getMyUserId() {
-        return fetch('https://www.pixiv.net/bookmark.php?type=user', { credentials: 'include' })
-            .then(res => res.text())
-            .then(text => {
-                const m = text.match(/member\.php\?id=(\d+)/);
-                return m ? m[1] : null;
-            })
-            .catch(() => null);
-    }
-
-    async function updateFollowedList() {
-        const userId = await getMyUserId();
-        if (!userId) {
-            console.warn('Pixiv: ユーザーIDが取得できませんでした。ログイン状態を確認してください。');
-            return;
-        }
-
-        let offset = 0;
-        const limit = 48;
-        let hasMore = true;
-        const newSet = new Set();
-
-        while (hasMore) {
-            const url = `https://www.pixiv.net/ajax/user/${userId}/following?offset=${offset}&limit=${limit}&rest=show`;
-            const res = await fetch(url, { credentials: 'include' });
-            if (!res.ok) {
-                console.warn('Pixiv: フォローリスト取得に失敗', res.status);
-                break;
-            }
-
-            const data = await res.json();
-            const users = Array.isArray(data.body?.users) ? data.body.users : [];
-            for (const u of users) {
-                newSet.add(String(u.userId));
-            }
-            hasMore = users.length === limit;
-            offset += limit;
-        }
-
-        followedSet = newSet;
-        GM_setValue(STORAGE_KEYS.followedList, JSON.stringify([...followedSet]));
-        updateBadge();
-        scanPage();
-    }
-
-    function loadFollowedListCache() {
-        const saved = GM_getValue(STORAGE_KEYS.followedList, null);
-        if (!saved) {
-            return;
-        }
+    function loadState() {
         try {
-            followedSet = new Set(JSON.parse(saved));
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return { ...DEFAULT_STATE };
+            const parsed = JSON.parse(raw);
+            return {
+                enabled: parsed.enabled !== false,
+                users: Array.isArray(parsed.users) ? parsed.users : []
+            };
         } catch (e) {
-            followedSet = new Set();
+            return { ...DEFAULT_STATE };
         }
     }
 
-    function createUi() {
-        if (ui) {
-            return;
-        }
+    function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateCountLabel();
+    }
 
-        const wrapper = document.createElement('div');
-        wrapper.id = 'pixiv-admin-floating';
+    function injectStyles() {
+        const style = document.createElement('style');
+        style.id = 'pixiv-follow-gray-style';
+        style.textContent = `
+            .pixiv-follow-gray-target {
+                filter: grayscale(1) !important;
+                opacity: 0.6 !important;
+            }
+            .pixiv-follow-gray-target img {
+                filter: grayscale(1) !important;
+            }
+            #pixiv-follow-gray-settings {
+                position: fixed;
+                right: 16px;
+                bottom: 16px;
+                z-index: 2147483647;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                color: #222;
+            }
+            #pixiv-follow-gray-toggle-btn {
+                width: 42px;
+                height: 42px;
+                border: none;
+                border-radius: 50%;
+                background: #fff;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                cursor: pointer;
+                font-size: 20px;
+            }
+            #pixiv-follow-gray-panel {
+                display: none;
+                width: 300px;
+                margin-top: 8px;
+                padding: 12px;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.96);
+                box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+            }
+            #pixiv-follow-gray-panel.open {
+                display: block;
+            }
+            #pixiv-follow-gray-panel textarea {
+                width: 100%;
+                min-height: 100px;
+                margin-top: 6px;
+                resize: vertical;
+                box-sizing: border-box;
+                padding: 6px;
+            }
+            #pixiv-follow-gray-panel button {
+                margin-top: 8px;
+                margin-right: 8px;
+                padding: 6px 10px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                background: #f5f5f5;
+                cursor: pointer;
+            }
+            #pixiv-follow-gray-panel label,
+            #pixiv-follow-gray-panel .count-label {
+                display: block;
+                margin-top: 6px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function createSettingsUI() {
+        const wrap = document.createElement('div');
+        wrap.id = 'pixiv-follow-gray-settings';
 
         const button = document.createElement('button');
-        button.id = 'pixiv-admin-toggle';
+        button.id = 'pixiv-follow-gray-toggle-btn';
         button.type = 'button';
-        button.setAttribute('aria-label', 'Pixiv管理設定');
-        button.textContent = '⚙️';
-
-        const badge = document.createElement('div');
-        badge.id = 'pixiv-admin-badge';
-        badge.textContent = '0';
+        button.title = 'Pixiv 管理設定';
+        button.textContent = '⚙';
+        wrap.appendChild(button);
 
         const panel = document.createElement('div');
-        panel.id = 'pixiv-admin-panel';
+        panel.id = 'pixiv-follow-gray-panel';
         panel.innerHTML = `
-            <h4>Pixiv管理設定</h4>
-            <div class="pixiv-admin-row">
-                <label><input type="checkbox" id="pixiv-admin-enable" /> グレー表示</label>
+            <div><strong>Pixiv 管理</strong></div>
+            <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
+            <div class="count-label" id="pixiv-follow-gray-count">適用中ユーザー数: 0人</div>
+            <textarea id="pixiv-follow-gray-user-list" placeholder="ユーザーIDやURLを1行ごとに入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
+            <div>
+                <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
+                <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
             </div>
-            <div class="pixiv-admin-row">
-                <label><input type="checkbox" id="pixiv-admin-show-badge" /> カウント表示</label>
-            </div>
-            <div class="pixiv-admin-row">
-                <span>更新間隔</span>
-                <select id="pixiv-admin-interval">
-                    <option value="5">5分</option>
-                    <option value="10">10分</option>
-                    <option value="30">30分</option>
-                </select>
-            </div>
-            <div class="pixiv-admin-hint">現在適用中のフォローユーザー数を右下のアイコンに表示します。</div>
         `;
+        wrap.appendChild(panel);
+        document.body.appendChild(wrap);
+    }
 
-        wrapper.appendChild(button);
-        wrapper.appendChild(badge);
-        wrapper.appendChild(panel);
-        document.body.appendChild(wrapper);
+    function bindEvents() {
+        const toggleBtn = document.getElementById('pixiv-follow-gray-toggle-btn');
+        const panel = document.getElementById('pixiv-follow-gray-panel');
+        const enabledInput = document.getElementById('pixiv-follow-gray-enabled');
+        const userList = document.getElementById('pixiv-follow-gray-user-list');
+        const saveBtn = document.getElementById('pixiv-follow-gray-save-btn');
+        const loadBtn = document.getElementById('pixiv-follow-gray-load-btn');
 
-        const enableInput = panel.querySelector('#pixiv-admin-enable');
-        const showBadgeInput = panel.querySelector('#pixiv-admin-show-badge');
-        const intervalSelect = panel.querySelector('#pixiv-admin-interval');
-
-        button.addEventListener('click', () => {
+        toggleBtn.addEventListener('click', () => {
             panel.classList.toggle('open');
         });
 
-        enableInput.addEventListener('change', () => {
-            settings.enabled = enableInput.checked;
-            saveSettings();
-            applySettings();
+        enabledInput.addEventListener('change', () => {
+            state.enabled = enabledInput.checked;
+            saveState();
+            applyGrayStyle();
         });
 
-        showBadgeInput.addEventListener('change', () => {
-            settings.showBadge = showBadgeInput.checked;
-            saveSettings();
-            updateBadge();
+        saveBtn.addEventListener('click', () => {
+            state.users = parseUserIds(userList.value);
+            state.enabled = enabledInput.checked;
+            saveState();
+            applyGrayStyle();
         });
 
-        intervalSelect.addEventListener('change', () => {
-            settings.refreshInterval = Number(intervalSelect.value);
-            saveSettings();
-            restartAutoRefresh();
+        loadBtn.addEventListener('click', () => {
+            loadUiFromState();
         });
 
         document.addEventListener('click', (event) => {
-            if (!wrapper.contains(event.target)) {
+            const panelOpen = panel.classList.contains('open');
+            const clickedInside = wrapContains(event.target, 'pixiv-follow-gray-settings');
+            if (panelOpen && !clickedInside) {
                 panel.classList.remove('open');
             }
         });
 
-        ui = { wrapper, button, badge, panel, enableInput, showBadgeInput, intervalSelect };
-        syncUiFromSettings();
+        loadUiFromState();
     }
 
-    function syncUiFromSettings() {
-        if (!ui) {
-            return;
-        }
-        ui.enableInput.checked = settings.enabled;
-        ui.showBadgeInput.checked = settings.showBadge;
-        ui.intervalSelect.value = String(settings.refreshInterval);
-        updateBadge();
+    function wrapContains(target, id) {
+        const root = document.getElementById(id);
+        return !!(root && root.contains(target));
     }
 
-    function updateBadge() {
-        if (!ui) {
-            return;
-        }
-        const count = followedSet.size;
-        if (settings.showBadge) {
-            ui.badge.textContent = count.toString();
-            ui.badge.style.display = 'inline-flex';
-        } else {
-            ui.badge.style.display = 'none';
-        }
+    function loadUiFromState() {
+        const enabledInput = document.getElementById('pixiv-follow-gray-enabled');
+        const userList = document.getElementById('pixiv-follow-gray-user-list');
+        enabledInput.checked = state.enabled;
+        userList.value = state.users.join('\n');
+        updateCountLabel();
     }
 
-    function removeGrayEffects() {
-        document.querySelectorAll('.pixiv-followed-gray').forEach(el => el.classList.remove('pixiv-followed-gray'));
+    function updateCountLabel(appliedCount) {
+        const countEl = document.getElementById('pixiv-follow-gray-count');
+        if (!countEl) return;
+        const resolvedCount = typeof appliedCount === 'number' ? appliedCount : (state.enabled ? state.users.length : 0);
+        countEl.textContent = `適用中ユーザー数: ${resolvedCount}人`;
     }
 
-    function grayOutIfFollowed(element) {
-        if (!settings.enabled) {
-            return;
-        }
-
-        const a = element.querySelector("a[href*='/users/']");
-        if (!a) {
-            return;
-        }
-
-        const m = a.href.match(/\/users\/(\d+)/);
-        if (!m || !followedSet.has(m[1])) {
-            return;
-        }
-
-        const img = element.querySelector('img');
-        if (img) {
-            img.classList.add('pixiv-followed-gray');
-        } else {
-            element.classList.add('pixiv-followed-gray');
-        }
-    }
-
-    function scanPage() {
-        if (!settings.enabled) {
-            removeGrayEffects();
-            return;
-        }
-
-        removeGrayEffects();
-        document.querySelectorAll('a[href*="/users/"]').forEach(a => {
-            const block = a.closest('article, li, figure, section, div');
-            if (block) {
-                grayOutIfFollowed(block);
+    function parseUserIds(text) {
+        if (!text) return [];
+        const trimmed = String(text).trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(normalizeUserId).filter(Boolean);
+                }
+            } catch (e) {
+                // fall through
             }
+        }
+        const rawItems = trimmed.split(/[\s,，\n]+/);
+        return Array.from(new Set(rawItems.map(normalizeUserId).filter(Boolean)));
+    }
+
+    function normalizeUserId(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        const match = text.match(/\/users\/(\d+)/i) || text.match(/(\d{2,})/);
+        return match ? match[1] : '';
+    }
+
+    function startObserver() {
+        if (observer) return;
+        observer = new MutationObserver(() => scheduleApply());
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['href', 'src', 'class', 'data-user-id']
         });
     }
 
-    function restartAutoRefresh() {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
+    function scheduleApply() {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+            scheduled = false;
+            applyGrayStyle();
+        });
+    }
+
+    function applyGrayStyle() {
+        removeGrayStyleFromAll();
+
+        if (!state.enabled || !state.users.length) {
+            updateCountLabel(0);
+            return;
         }
-        if (settings.refreshInterval > 0) {
-            refreshTimer = setInterval(() => {
-                updateFollowedList();
-            }, settings.refreshInterval * 60 * 1000);
-        }
+
+        const targets = new Set(state.users);
+        const relatedNodes = document.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]');
+        let matchedCount = 0;
+
+        relatedNodes.forEach((node) => {
+            const userId = getUserIdFromElement(node);
+            if (!userId || !targets.has(userId)) return;
+            matchedCount += 1;
+            node.classList.add('pixiv-follow-gray-target');
+            const images = node.querySelectorAll('img');
+            images.forEach((img) => img.classList.add('pixiv-follow-gray-target'));
+            if (node.tagName === 'IMG') {
+                node.classList.add('pixiv-follow-gray-target');
+            }
+        });
+
+        updateCountLabel(matchedCount);
     }
 
-    function applySettings() {
-        syncUiFromSettings();
-        scanPage();
+    function getUserIdFromElement(node) {
+        const direct = node.getAttribute('data-user-id') || node.getAttribute('data-user') || node.getAttribute('data-id');
+        if (direct) return String(direct).trim();
+        const href = node.getAttribute('href') || '';
+        const match = href.match(/\/users\/(\d+)/i);
+        return match ? match[1] : '';
     }
 
-    const observer = new MutationObserver(() => {
-        scanPage();
-    });
-
-    function init() {
-        loadFollowedListCache();
-        createUi();
-        applySettings();
-        updateFollowedList();
-        restartAutoRefresh();
-        observer.observe(document.body, { childList: true, subtree: true });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else {
-        init();
+    function removeGrayStyleFromAll() {
+        document.querySelectorAll('.pixiv-follow-gray-target').forEach((el) => {
+            el.classList.remove('pixiv-follow-gray-target');
+            el.style.filter = '';
+        });
     }
 })();
