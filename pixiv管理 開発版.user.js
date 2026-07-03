@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.0
+// @name         Pixiv管理 開発版v4.0.1
 // @namespace    https://example.com/userscripts
-// @version      4.0.0
+// @version      4.0.1
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -215,6 +215,31 @@
             #pixiv-follow-gray-panel input[type="checkbox"] {
                 accent-color: #2563eb;
                 transform: translateY(1px);
+            }
+            /* mobile tweaks */
+            @media (max-width: 640px) {
+                #pixiv-follow-gray-panel {
+                    width: 90vw;
+                    left: 5vw;
+                    right: auto;
+                    padding: 10px;
+                    font-size: 13px;
+                }
+                #pixiv-follow-gray-toggle-btn {
+                    width: 44px;
+                    height: 44px;
+                    font-size: 20px;
+                }
+                #pixiv-follow-gray-panel .user-list {
+                    position: static;
+                    width: 100%;
+                    max-height: 200px;
+                    transform: none;
+                    box-shadow: none;
+                }
+                #pixiv-follow-badge {
+                    bottom: 14px;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -630,6 +655,34 @@
             if (section) {
                 return section;
             }
+        }
+
+        // Fallback for mobile or different layouts: find a container after the main artwork area
+        try {
+            const main = document.querySelector('main, article, [role="main"], #root');
+            if (main) {
+                let sib = main.nextElementSibling;
+                while (sib) {
+                    const anchors = Array.from(sib.querySelectorAll('a[href*="/users/"]'));
+                    if (anchors.length >= 3) return sib;
+                    sib = sib.nextElementSibling;
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        // Another fallback: find any container with multiple thumbnails linking to users
+        const allContainers = Array.from(document.querySelectorAll('div,section'));
+        for (const c of allContainers) {
+            try {
+                const anchors = c.querySelectorAll('a[href*="/users/"]');
+                if (anchors && anchors.length >= 4) {
+                    // avoid picking the whole page
+                    if (!c.closest('body')) continue;
+                    return c;
+                }
+            } catch (e) {}
         }
 
         return null;
