@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.8
+// @name         Pixiv管理 開発版v3.9
 // @namespace    https://example.com/userscripts
-// @version      3.8
+// @version      3.9
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -162,28 +162,32 @@
             }
             #pixiv-follow-gray-panel .user-list {
                 margin-top: 8px;
-                max-height: 170px;
-                overflow: auto;
+                max-height: 120px;
+                overflow-x: auto;
+                overflow-y: hidden;
                 border: 1px solid #cbd5e1;
                 border-radius: 10px;
                 background: #f8fafc;
                 padding: 8px;
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                white-space: nowrap;
             }
             #pixiv-follow-gray-panel .user-item {
-                display: flex;
-                justify-content: space-between;
+                display: inline-flex;
+                flex: 0 0 auto;
                 align-items: center;
                 gap: 8px;
-                margin-bottom: 6px;
-                padding: 6px 8px;
+                margin: 0;
+                padding: 6px 10px;
                 border-radius: 8px;
                 background: #ffffff;
                 border: 1px solid rgba(148,163,184,0.2);
                 font-size: 12px;
                 color: #111827;
-            }
-            #pixiv-follow-gray-panel .user-item:last-child {
-                margin-bottom: 0;
+                min-width: 120px;
+                box-sizing: border-box;
             }
             #pixiv-follow-gray-panel .user-item button {
                 margin-top: 0;
