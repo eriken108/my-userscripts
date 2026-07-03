@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v1.8
+// @name         Pixiv管理 開発版v1.9
 // @namespace    https://example.com/userscripts
-// @version      1.8
+// @version      1.9
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -305,14 +305,12 @@
             const userId = getUserIdFromElement(node);
             if (!userId || !targets.has(userId)) return;
             matchedCount += 1;
-            node.classList.add('pixiv-follow-gray-target');
 
-            const media = node.querySelectorAll('img, video, picture, canvas');
+            const card = findRelatedItemCard(node);
+            card.classList.add('pixiv-follow-gray-target');
+
+            const media = card.querySelectorAll('img, video, picture, canvas');
             media.forEach((el) => el.classList.add('pixiv-follow-gray-target'));
-
-            if (node.tagName === 'IMG' || node.tagName === 'VIDEO' || node.tagName === 'PICTURE' || node.tagName === 'CANVAS') {
-                node.classList.add('pixiv-follow-gray-target');
-            }
         });
 
         updateCountLabel(matchedCount);
@@ -324,6 +322,26 @@
         const href = node.getAttribute('href') || '';
         const match = href.match(/\/users\/(\d+)/i);
         return match ? match[1] : '';
+    }
+
+    function findRelatedItemCard(node) {
+        let closestCard = node;
+        let current = node.parentElement;
+
+        while (current && current !== document.body) {
+            const media = Array.from(current.querySelectorAll('img, video, picture, canvas'));
+            const outsideMedia = media.filter((el) => !node.contains(el));
+            if (outsideMedia.length > 0) {
+                return current;
+            }
+            if (media.length > 1) {
+                return current;
+            }
+            closestCard = current;
+            current = current.parentElement;
+        }
+
+        return closestCard;
     }
 
     function removeGrayStyleFromAll() {
