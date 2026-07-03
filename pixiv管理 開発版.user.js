@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.9
+// @name         Pixiv管理 開発版v4.0.0
 // @namespace    https://example.com/userscripts
-// @version      3.9
+// @version      4.0.0
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -160,34 +160,43 @@
                 color: #111827;
                 font-size: 12px;
             }
+            /* user list: move left of panel and keep vertical scroll */
+            #pixiv-follow-gray-panel {
+                position: relative;
+            }
             #pixiv-follow-gray-panel .user-list {
-                margin-top: 8px;
-                max-height: 120px;
-                overflow-x: auto;
-                overflow-y: hidden;
+                position: absolute;
+                right: 100%;
+                bottom: 0;
+                width: 260px;
+                max-height: 260px;
+                overflow-y: auto;
+                overflow-x: hidden;
                 border: 1px solid #cbd5e1;
                 border-radius: 10px;
                 background: #f8fafc;
                 padding: 8px;
-                display: flex;
-                gap: 8px;
-                align-items: flex-start;
-                white-space: nowrap;
+                display: block;
+                box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+                transform: translateX(-12px);
             }
             #pixiv-follow-gray-panel .user-item {
-                display: inline-flex;
-                flex: 0 0 auto;
+                display: flex;
+                justify-content: space-between;
                 align-items: center;
                 gap: 8px;
-                margin: 0;
-                padding: 6px 10px;
+                margin-bottom: 6px;
+                padding: 6px 8px;
                 border-radius: 8px;
                 background: #ffffff;
                 border: 1px solid rgba(148,163,184,0.2);
                 font-size: 12px;
                 color: #111827;
-                min-width: 120px;
+                width: 100%;
                 box-sizing: border-box;
+            }
+            #pixiv-follow-gray-panel .user-item:last-child {
+                margin-bottom: 0;
             }
             #pixiv-follow-gray-panel .user-item button {
                 margin-top: 0;
