@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.2
+// @name         Pixiv管理 開発版v2.3
 // @namespace    https://example.com/userscripts
-// @version      2.2
+// @version      2.3
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -170,6 +170,12 @@
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
                 <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
             </div>
+            <hr>
+            <div>
+                <label><input id="pixiv-follow-auto-save-checkbox" type="checkbox"> フォロー済みを自動で保存</label>
+                <button id="pixiv-follow-scan-btn" type="button">hoverでスキャンして保存</button>
+                <div id="pixiv-follow-scan-status" style="margin-top:6px;font-size:12px;color:#374151">状態: 停止中</div>
+            </div>
         `;
         wrap.appendChild(panel);
         document.body.appendChild(wrap);
@@ -202,6 +208,31 @@
 
         loadBtn.addEventListener('click', () => {
             loadUiFromState();
+        });
+
+        // auto-save controls
+        const autoChk = document.getElementById('pixiv-follow-auto-save-checkbox');
+        const scanBtn = document.getElementById('pixiv-follow-scan-btn');
+        const statusEl = document.getElementById('pixiv-follow-scan-status');
+        let autoScanInterval = null;
+
+        scanBtn.addEventListener('click', async () => {
+            statusEl.textContent = '状態: スキャン中...';
+            await scanAndAutoSave();
+            statusEl.textContent = '状態: 停止中';
+        });
+
+        autoChk.addEventListener('change', () => {
+            if (autoChk.checked) {
+                statusEl.textContent = '状態: 自動スキャン 有効';
+                autoScanInterval = setInterval(() => {
+                    scanAndAutoSave();
+                }, 8000);
+            } else {
+                statusEl.textContent = '状態: 停止中';
+                if (autoScanInterval) clearInterval(autoScanInterval);
+                autoScanInterval = null;
+            }
         });
 
         document.addEventListener('click', (event) => {
@@ -337,5 +368,87 @@
             el.classList.remove('pixiv-follow-gray-target');
             el.style.filter = '';
         });
+    }
+
+    // --- hover 判定と自動保存機能 ---
+    function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+    }
+
+    async function scanAndAutoSave() {
+        if (!/^\/artworks\//.test(location.pathname)) return;
+        const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]'));
+        let added = 0;
+        for (const node of relatedNodes) {
+            const userId = getUserIdFromElement(node);
+            if (!userId) continue;
+            if (state.users.includes(userId)) continue;
+            try {
+                const followed = await checkFollowByHover(node);
+                if (followed) {
+                    state.users.push(userId);
+                    saveState();
+                    added += 1;
+                }
+            } catch (e) {
+                // ignore per-node errors
+            }
+            // 少し待つ
+            await sleep(250 + Math.random() * 200);
+        }
+        updateCountLabel();
+        return added;
+    }
+
+    async function checkFollowByHover(node) {
+        // トリガーとしてマウスイベントを発火させ、hoverカードの生成を待つ
+        try {
+            node.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window }));
+            node.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true, view: window }));
+            node.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, view: window }));
+        } catch (e) {
+            // ignore
+        }
+
+        const card = await waitForHoverCard(node, 900);
+        if (!card) return false;
+        const text = (card.textContent || '').replace(/\s+/g, ' ');
+        // 日本語/英語両対応で判定
+        if (/フォロー中|フォロー解除|Following|Unfollow/.test(text)) return true;
+        if (/フォローする|Follow/.test(text)) return false;
+        // 明確な情報がなければ false
+        return false;
+    }
+
+    function findHoverCandidatesByText(node) {
+        const keywords = /フォロー中|フォロー解除|フォローする|Following|Unfollow|Follow/;
+        const els = Array.from(document.querySelectorAll('div,span,button,section'));
+        const rect = node.getBoundingClientRect();
+        const near = els.filter(el => {
+            if (!el.textContent) return false;
+            if (!keywords.test(el.textContent)) return false;
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return false;
+            // 近接している要素を探す
+            const dx = Math.max(0, Math.max(r.left - rect.right, rect.left - r.right));
+            const dy = Math.max(0, Math.max(r.top - rect.bottom, rect.top - r.bottom));
+            const dist = Math.hypot(dx, dy);
+            return dist < 400; // 近ければ候補
+        });
+        return near;
+    }
+
+    async function waitForHoverCard(node, timeout = 800) {
+        const interval = 120;
+        const max = Math.max(1, Math.floor(timeout / interval));
+        for (let i = 0; i < max; i++) {
+            const cand = findHoverCandidatesByText(node);
+            if (cand.length) {
+                // 可能性の高いものを返す
+                return cand[0];
+            }
+            await sleep(interval);
+        }
+        return null;
     }
 })();
