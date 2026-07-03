@@ -1,16 +1,20 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.0
+// @name         Pixiv管理 開発版v2.1
 // @namespace    https://example.com/userscripts
-// @version      2.0
+// @version      2.1
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
-// @match        https://www.pixiv.net/*
-// @match        https://pixiv.net/*
+// @match        https://www.pixiv.net/artworks/*
+// @match        https://pixiv.net/artworks/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
 
 (function () {
     'use strict';
+
+    if (!/^\/artworks\//.test(location.pathname)) {
+        return;
+    }
 
     const STORAGE_KEY = 'pixiv_follow_gray_users_v1';
     const DEFAULT_STATE = { enabled: true, users: [] };
