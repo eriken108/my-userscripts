@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.7
+// @name         Pixiv管理 開発版v3.8
 // @namespace    https://example.com/userscripts
-// @version      3.7
+// @version      3.8
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -65,7 +65,7 @@
                 bottom: 16px;
                 z-index: 2147483647;
                 display: flex;
-                flex-direction: column;
+                flex-direction: column-reverse;
                 align-items: flex-end;
                 gap: 8px;
                 font-family: Arial, sans-serif;
