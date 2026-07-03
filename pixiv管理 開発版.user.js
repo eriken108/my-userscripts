@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.0
+// @name         Pixiv管理 開発版v3.1
 // @namespace    https://example.com/userscripts
-// @version      3.0
+// @version      3.1
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -165,7 +165,7 @@
         panel.innerHTML = `
             <div class="panel-title">Pixiv 管理</div>
             <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
-            <div class="count-label" id="pixiv-follow-gray-count">適用中ユーザー数: 0人</div>
+            <div class="count-label" id="pixiv-follow-gray-count">適用ユーザー数: 0人　記録ユーザー数: 0人</div>
             <textarea id="pixiv-follow-gray-user-list" placeholder="ユーザーIDやURLを1行ごとに入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
             <div>
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
@@ -308,8 +308,9 @@
     function updateCountLabel(appliedCount) {
         const countEl = document.getElementById('pixiv-follow-gray-count');
         if (!countEl) return;
-        const resolvedCount = typeof appliedCount === 'number' ? appliedCount : (state.enabled ? state.users.length : 0);
-        countEl.textContent = `適用中ユーザー数: ${resolvedCount}人`;
+        const applied = typeof appliedCount === 'number' ? appliedCount : (state.enabled ? state.users.length : 0);
+        const recorded = Array.isArray(state.users) ? state.users.length : 0;
+        countEl.textContent = `適用ユーザー数: ${applied}人　記録ユーザー数: ${recorded}人`;
     }
 
     function parseUserIds(text) {
