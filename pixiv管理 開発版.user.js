@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.3
+// @name         Pixiv管理 開発版v3.4
 // @namespace    https://example.com/userscripts
-// @version      3.3
+// @version      3.4
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -415,8 +415,14 @@
             return;
         }
 
+        const relatedSection = findRelatedWorksSection();
+        if (!relatedSection) {
+            updateCountLabel(0);
+            return;
+        }
+
         const targets = new Set(state.users);
-        const relatedNodes = document.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]');
+        const relatedNodes = relatedSection.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]');
         let matchedCount = 0;
 
         relatedNodes.forEach((node) => {
@@ -429,6 +435,24 @@
         });
 
         updateCountLabel(matchedCount);
+    }
+
+    function findRelatedWorksSection() {
+        const sectionLabel = /関連作品|おすすめ作品|Related works|Related illustrations|Recommended works|Recommended/i;
+        const candidates = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6,div,span'))
+            .filter((el) => {
+                const text = (el.textContent || '').trim();
+                return text.length > 0 && text.length < 40 && sectionLabel.test(text);
+            });
+
+        for (const el of candidates) {
+            const section = el.closest('section') || el.closest('div');
+            if (section) {
+                return section;
+            }
+        }
+
+        return null;
     }
 
     function getUserIdFromElement(node) {
