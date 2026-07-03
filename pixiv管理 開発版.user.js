@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.2
+// @name         Pixiv管理 開発版v3.3
 // @namespace    https://example.com/userscripts
-// @version      3.2
+// @version      3.3
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -16,6 +16,7 @@
     const DEFAULT_STATE = { enabled: true, users: [] };
     let state = loadState();
     const IS_FOLLOWING_PAGE = /^\/users\/\d+\/following\/?$/.test(location.pathname);
+    const IS_USER_PAGE = /^\/users\/(\d+)\/?$/.test(location.pathname);
     let observer = null;
     let scheduled = false;
 
@@ -23,6 +24,7 @@
     createSettingsUI();
     bindEvents();
     applyGrayStyle();
+    showUserPageBadge();
     startObserver();
 
     window.addEventListener('load', () => applyGrayStyle());
@@ -44,6 +46,7 @@
     function saveState() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         updateCountLabel();
+        showUserPageBadge();
     }
 
     function injectStyles() {
@@ -183,6 +186,51 @@
         `;
         wrap.appendChild(panel);
         document.body.appendChild(wrap);
+    }
+
+    // ユーザーページ用の「記録済み」バッジを作成/表示
+    function createUserPageBadge() {
+        if (document.getElementById('pixiv-follow-badge')) return;
+        const el = document.createElement('div');
+        el.id = 'pixiv-follow-badge';
+        el.style.position = 'fixed';
+        el.style.bottom = '20px';
+        el.style.left = '50%';
+        el.style.transform = 'translateX(-50%)';
+        el.style.padding = '8px 12px';
+        el.style.borderRadius = '12px';
+        el.style.background = 'linear-gradient(90deg,#2563eb,#1d4ed8)';
+        el.style.color = '#ffffff';
+        el.style.fontWeight = '700';
+        el.style.zIndex = '2147483647';
+        el.style.boxShadow = '0 8px 20px rgba(15,23,42,0.28)';
+        el.style.pointerEvents = 'none';
+        el.style.fontFamily = 'Arial, sans-serif';
+        el.style.fontSize = '13px';
+        el.style.display = 'none';
+        el.textContent = '記録済み';
+        document.body.appendChild(el);
+    }
+
+    function showUserPageBadge() {
+        try {
+            if (!IS_USER_PAGE) return;
+            createUserPageBadge();
+            const m = location.pathname.match(/^\/users\/(\d+)\/?$/);
+            if (!m) return;
+            const userId = m[1];
+            const badge = document.getElementById('pixiv-follow-badge');
+            if (!badge) return;
+            // 表示条件: 記録済みユーザーであれば表示
+            const recorded = Array.isArray(state.users) && state.users.indexOf(userId) !== -1;
+            if (recorded) {
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+        } catch (e) {
+            // ignore
+        }
     }
 
     function bindEvents() {
