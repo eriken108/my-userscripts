@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 安定版v3.6
+// @name         Pixiv管理 安定版v4.0.0
 // @namespace    https://example.com/userscripts
-// @version      3.6
+// @version      4.0.0
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -65,7 +65,7 @@
                 bottom: 16px;
                 z-index: 2147483647;
                 display: flex;
-                flex-direction: column;
+                flex-direction: column-reverse;
                 align-items: flex-end;
                 gap: 8px;
                 font-family: Arial, sans-serif;
@@ -160,14 +160,25 @@
                 color: #111827;
                 font-size: 12px;
             }
+            /* user list: move left of panel and keep vertical scroll */
+            #pixiv-follow-gray-panel {
+                position: relative;
+            }
             #pixiv-follow-gray-panel .user-list {
-                margin-top: 8px;
-                max-height: 170px;
-                overflow: auto;
+                position: absolute;
+                right: 100%;
+                bottom: 0;
+                width: 260px;
+                max-height: 260px;
+                overflow-y: auto;
+                overflow-x: hidden;
                 border: 1px solid #cbd5e1;
                 border-radius: 10px;
                 background: #f8fafc;
                 padding: 8px;
+                display: block;
+                box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+                transform: translateX(-12px);
             }
             #pixiv-follow-gray-panel .user-item {
                 display: flex;
@@ -181,6 +192,8 @@
                 border: 1px solid rgba(148,163,184,0.2);
                 font-size: 12px;
                 color: #111827;
+                width: 100%;
+                box-sizing: border-box;
             }
             #pixiv-follow-gray-panel .user-item:last-child {
                 margin-bottom: 0;
@@ -234,6 +247,7 @@
             <div>
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
                 <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
+                <button id="pixiv-follow-clear-all-btn" type="button">全削除</button>
                 <button id="pixiv-follow-export-btn" type="button">エクスポート</button>
                 <button id="pixiv-follow-import-btn" type="button">インポート</button>
                 <input id="pixiv-follow-import-file" type="file" accept="application/json" style="display:none">
@@ -337,6 +351,18 @@
         loadBtn.addEventListener('click', () => {
             loadUiFromState();
         });
+
+        const clearAllBtn = document.getElementById('pixiv-follow-clear-all-btn');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => {
+                if (!confirm('記録を全て削除しますか？')) return;
+                state.users = [];
+                saveState();
+                loadUiFromState();
+                applyGrayStyle();
+                showUserPageBadge();
+            });
+        }
 
         const searchInput = document.getElementById('pixiv-follow-search-input');
         const sortAscBtn = document.getElementById('pixiv-follow-sort-asc-btn');
@@ -493,6 +519,14 @@
         const existing = Array.isArray(state.users) ? state.users : [];
         const updated = existing.filter((id) => id !== userId);
         state.users = updated;
+        saveState();
+        loadUiFromState();
+        applyGrayStyle();
+        showUserPageBadge();
+    }
+
+    function clearAllUsers() {
+        state.users = [];
         saveState();
         loadUiFromState();
         applyGrayStyle();
