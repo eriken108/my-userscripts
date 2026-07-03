@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.6
+// @name         Pixiv管理 開発版v3.7
 // @namespace    https://example.com/userscripts
-// @version      3.6
+// @version      3.7
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -234,6 +234,7 @@
             <div>
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
                 <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
+                <button id="pixiv-follow-clear-all-btn" type="button">全削除</button>
                 <button id="pixiv-follow-export-btn" type="button">エクスポート</button>
                 <button id="pixiv-follow-import-btn" type="button">インポート</button>
                 <input id="pixiv-follow-import-file" type="file" accept="application/json" style="display:none">
@@ -337,6 +338,18 @@
         loadBtn.addEventListener('click', () => {
             loadUiFromState();
         });
+
+        const clearAllBtn = document.getElementById('pixiv-follow-clear-all-btn');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => {
+                if (!confirm('記録を全て削除しますか？')) return;
+                state.users = [];
+                saveState();
+                loadUiFromState();
+                applyGrayStyle();
+                showUserPageBadge();
+            });
+        }
 
         const searchInput = document.getElementById('pixiv-follow-search-input');
         const sortAscBtn = document.getElementById('pixiv-follow-sort-asc-btn');
@@ -493,6 +506,14 @@
         const existing = Array.isArray(state.users) ? state.users : [];
         const updated = existing.filter((id) => id !== userId);
         state.users = updated;
+        saveState();
+        loadUiFromState();
+        applyGrayStyle();
+        showUserPageBadge();
+    }
+
+    function clearAllUsers() {
+        state.users = [];
         saveState();
         loadUiFromState();
         applyGrayStyle();
