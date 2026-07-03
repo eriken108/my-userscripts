@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v1.9
+// @name         Pixiv管理 開発版v2.0
 // @namespace    https://example.com/userscripts
-// @version      1.9
+// @version      2.0
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -52,15 +52,6 @@
             .pixiv-follow-gray-target {
                 filter: grayscale(1) !important;
                 opacity: 0.6 !important;
-            }
-            .pixiv-follow-gray-target img,
-            .pixiv-follow-gray-target video,
-            .pixiv-follow-gray-target picture,
-            .pixiv-follow-gray-target canvas {
-                filter: grayscale(1) !important;
-            }
-            .pixiv-follow-gray-target * {
-                color: inherit !important;
             }
             #pixiv-follow-gray-settings {
                 position: fixed;
@@ -308,9 +299,6 @@
 
             const card = findRelatedItemCard(node);
             card.classList.add('pixiv-follow-gray-target');
-
-            const media = card.querySelectorAll('img, video, picture, canvas');
-            media.forEach((el) => el.classList.add('pixiv-follow-gray-target'));
         });
 
         updateCountLabel(matchedCount);
