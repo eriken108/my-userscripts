@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.7
+// @name         Pixiv管理 開発版v2.8
 // @namespace    https://example.com/userscripts
-// @version      2.7
+// @version      2.8
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -354,6 +354,7 @@
         requestAnimationFrame(() => {
             scheduled = false;
             applyGrayStyle();
+            if (IS_FOLLOWING_PAGE) markFollowingPageUsersApplied();
         });
     }
 
@@ -496,6 +497,26 @@
             await sleep(interval);
         }
         return null;
+    }
+
+    // followingページに表示されているユーザー要素をグレー表示する
+    function markFollowingPageUsersApplied() {
+        try {
+            const targets = new Set(state.users || []);
+            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"]'));
+            anchors.forEach((a) => {
+                const id = getUserIdFromElement(a);
+                if (!id) return;
+                const card = findRelatedItemCard(a) || a;
+                if (targets.has(id)) {
+                    card.classList.add('pixiv-follow-gray-target');
+                } else {
+                    card.classList.remove('pixiv-follow-gray-target');
+                }
+            });
+        } catch (e) {
+            // ignore
+        }
     }
 
     // フォロー一覧ページからユーザーIDを収集して保存する
