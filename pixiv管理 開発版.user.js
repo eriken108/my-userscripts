@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.5
+// @name         Pixiv管理 開発版v3.6
 // @namespace    https://example.com/userscripts
-// @version      3.5
+// @version      3.6
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -111,11 +111,9 @@
                 color: #0f172a;
                 margin-bottom: 8px;
             }
-            #pixiv-follow-gray-panel textarea {
+            #pixiv-follow-gray-panel input[type="text"] {
                 width: 100%;
-                min-height: 110px;
                 margin-top: 6px;
-                resize: vertical;
                 box-sizing: border-box;
                 padding: 8px;
                 border: 1px solid #cbd5e1;
@@ -226,7 +224,7 @@
             <div class="panel-title">Pixiv 管理</div>
             <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
             <div class="count-label" id="pixiv-follow-gray-count">適用ユーザー数: 0人　記録ユーザー数: 0人</div>
-            <textarea id="pixiv-follow-gray-user-list" placeholder="ユーザーIDやURLを1行ごとに入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
+            <input id="pixiv-follow-gray-user-list" type="text" placeholder="追加するユーザーIDまたはURLを入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
             <div class="list-controls">
                 <input id="pixiv-follow-search-input" type="text" placeholder="リスト検索">
                 <button id="pixiv-follow-sort-asc-btn" type="button">昇順</button>
@@ -323,10 +321,17 @@
         });
 
         saveBtn.addEventListener('click', () => {
-            state.users = parseUserIds(userList.value);
-            state.enabled = enabledInput.checked;
-            saveState();
-            applyGrayStyle();
+            const newUsers = parseUserIds(userList.value);
+            if (newUsers.length) {
+                const existing = Array.isArray(state.users) ? state.users : [];
+                const set = new Set(existing.concat(newUsers));
+                state.users = Array.from(set);
+                state.enabled = enabledInput.checked;
+                saveState();
+                applyGrayStyle();
+                userList.value = '';
+                renderUserList();
+            }
         });
 
         loadBtn.addEventListener('click', () => {
@@ -450,7 +455,7 @@
         const enabledInput = document.getElementById('pixiv-follow-gray-enabled');
         const userList = document.getElementById('pixiv-follow-gray-user-list');
         enabledInput.checked = state.enabled;
-        userList.value = state.users.join('\n');
+        userList.value = '';
         renderUserList();
         updateCountLabel();
     }
