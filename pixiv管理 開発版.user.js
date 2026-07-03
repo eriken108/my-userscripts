@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.9
+// @name         Pixiv管理 開発版v3.0
 // @namespace    https://example.com/userscripts
-// @version      2.9
+// @version      3.0
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -561,11 +561,18 @@
 
     // エクスポート/インポート
     function exportStateToFile() {
-        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const data = JSON.stringify(state, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
+
+        const count = Array.isArray(state.users) ? state.users.length : 0;
+        const now = new Date();
+        const pad = (v) => String(v).padStart(2, '0');
+        const filename = `${count}件_pixiv管理${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())}.json`;
+
         a.href = url;
-        a.download = 'pixiv_follow_gray_state.json';
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
