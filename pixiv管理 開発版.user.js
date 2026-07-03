@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.5
+// @name         Pixiv管理 開発版v2.6
 // @namespace    https://example.com/userscripts
-// @version      2.5
+// @version      2.6
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -169,6 +169,9 @@
             <div>
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
                 <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
+                <button id="pixiv-follow-export-btn" type="button">エクスポート</button>
+                <button id="pixiv-follow-import-btn" type="button">インポート</button>
+                <input id="pixiv-follow-import-file" type="file" accept="application/json" style="display:none">
             </div>
             <hr>
             <div>
@@ -233,6 +236,38 @@
                 if (autoScanInterval) clearInterval(autoScanInterval);
                 autoScanInterval = null;
             }
+        });
+
+        // export / import
+        const exportBtn = document.getElementById('pixiv-follow-export-btn');
+        const importBtn = document.getElementById('pixiv-follow-import-btn');
+        const fileInput = document.getElementById('pixiv-follow-import-file');
+
+        exportBtn.addEventListener('click', () => {
+            exportStateToFile();
+        });
+
+        importBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (ev) => {
+            const f = ev.target.files && ev.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const txt = String(e.target.result || '');
+                    importStateFromText(txt);
+                    alert('インポート完了');
+                    loadUiFromState();
+                    applyGrayStyle();
+                } catch (err) {
+                    alert('インポートに失敗しました: ' + err);
+                }
+            };
+            reader.readAsText(f, 'utf-8');
         });
 
         document.addEventListener('click', (event) => {
@@ -450,5 +485,41 @@
             await sleep(interval);
         }
         return null;
+    }
+
+    // エクスポート/インポート
+    function exportStateToFile() {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pixiv_follow_gray_state.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function importStateFromText(text) {
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && Array.isArray(parsed.users)) {
+                state.users = Array.from(new Set(parsed.users.map(String)));
+                state.enabled = parsed.enabled !== false;
+                saveState();
+                return;
+            }
+        } catch (e) {
+            // fall through to line-based import
+        }
+
+        const users = parseUserIds(text);
+        if (users.length) {
+            state.users = Array.from(new Set((state.users || []).concat(users)));
+            saveState();
+            return;
+        }
+
+        throw new Error('不明なインポート形式');
     }
 })();
