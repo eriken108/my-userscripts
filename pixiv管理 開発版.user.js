@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.4
+// @name         Pixiv管理 開発版v3.5
 // @namespace    https://example.com/userscripts
-// @version      3.4
+// @version      3.5
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -19,6 +19,8 @@
     const IS_USER_PAGE = /^\/users\/(\d+)\/?$/.test(location.pathname);
     let observer = null;
     let scheduled = false;
+    let userListSortOrder = 'asc';
+    let userListFilter = '';
 
     injectStyles();
     createSettingsUI();
@@ -144,6 +146,61 @@
                 color: #334155;
                 font-weight: 600;
             }
+            #pixiv-follow-gray-settings .list-controls {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                margin-top: 8px;
+            }
+            #pixiv-follow-gray-settings .list-controls input[type="text"] {
+                flex: 1 1 auto;
+                min-width: 120px;
+                padding: 7px 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                background: #fff;
+                color: #111827;
+                font-size: 12px;
+            }
+            #pixiv-follow-gray-panel .user-list {
+                margin-top: 8px;
+                max-height: 170px;
+                overflow: auto;
+                border: 1px solid #cbd5e1;
+                border-radius: 10px;
+                background: #f8fafc;
+                padding: 8px;
+            }
+            #pixiv-follow-gray-panel .user-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+                padding: 6px 8px;
+                border-radius: 8px;
+                background: #ffffff;
+                border: 1px solid rgba(148,163,184,0.2);
+                font-size: 12px;
+                color: #111827;
+            }
+            #pixiv-follow-gray-panel .user-item:last-child {
+                margin-bottom: 0;
+            }
+            #pixiv-follow-gray-panel .user-item button {
+                margin-top: 0;
+                margin-right: 0;
+                padding: 4px 8px;
+                border-radius: 8px;
+                font-size: 11px;
+            }
+            #pixiv-follow-gray-panel .user-item .delete-btn {
+                background: #ef4444;
+                border-color: #ef4444;
+            }
+            #pixiv-follow-gray-panel .user-item .delete-btn:hover {
+                background: #dc2626;
+            }
             #pixiv-follow-gray-panel input[type="checkbox"] {
                 accent-color: #2563eb;
                 transform: translateY(1px);
@@ -170,6 +227,12 @@
             <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
             <div class="count-label" id="pixiv-follow-gray-count">適用ユーザー数: 0人　記録ユーザー数: 0人</div>
             <textarea id="pixiv-follow-gray-user-list" placeholder="ユーザーIDやURLを1行ごとに入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
+            <div class="list-controls">
+                <input id="pixiv-follow-search-input" type="text" placeholder="リスト検索">
+                <button id="pixiv-follow-sort-asc-btn" type="button">昇順</button>
+                <button id="pixiv-follow-sort-desc-btn" type="button">降順</button>
+            </div>
+            <div class="user-list" id="pixiv-follow-user-list-container"></div>
             <div>
                 <button id="pixiv-follow-gray-save-btn" type="button">保存</button>
                 <button id="pixiv-follow-gray-load-btn" type="button">読み込み</button>
@@ -204,12 +267,20 @@
         el.style.fontWeight = '700';
         el.style.zIndex = '2147483647';
         el.style.boxShadow = '0 8px 20px rgba(15,23,42,0.28)';
-        el.style.pointerEvents = 'none';
+        el.style.pointerEvents = 'auto';
         el.style.fontFamily = 'Arial, sans-serif';
         el.style.fontSize = '13px';
         el.style.display = 'none';
-        el.textContent = '記録済み';
+        el.innerHTML = '<span>記録済み</span> <button id="pixiv-follow-badge-delete" style="margin-left:10px;padding:4px 8px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-size:11px;cursor:pointer;">削除</button>';
         document.body.appendChild(el);
+        el.addEventListener('click', (ev) => {
+            if (ev.target && ev.target.id === 'pixiv-follow-badge-delete') {
+                const m = location.pathname.match(/^\/users\/(\d+)\/?$/);
+                if (m) {
+                    removeUserById(m[1]);
+                }
+            }
+        });
     }
 
     function showUserPageBadge() {
@@ -260,6 +331,36 @@
 
         loadBtn.addEventListener('click', () => {
             loadUiFromState();
+        });
+
+        const searchInput = document.getElementById('pixiv-follow-search-input');
+        const sortAscBtn = document.getElementById('pixiv-follow-sort-asc-btn');
+        const sortDescBtn = document.getElementById('pixiv-follow-sort-desc-btn');
+        const userListContainer = document.getElementById('pixiv-follow-user-list-container');
+
+        searchInput.addEventListener('input', () => {
+            userListFilter = searchInput.value;
+            renderUserList();
+        });
+
+        sortAscBtn.addEventListener('click', () => {
+            userListSortOrder = 'asc';
+            renderUserList();
+        });
+
+        sortDescBtn.addEventListener('click', () => {
+            userListSortOrder = 'desc';
+            renderUserList();
+        });
+
+        userListContainer.addEventListener('click', (ev) => {
+            const target = ev.target;
+            if (target && target.matches('.delete-btn')) {
+                const userId = target.getAttribute('data-user-id');
+                if (userId) {
+                    removeUserById(userId);
+                }
+            }
         });
 
         // auto-save controls
@@ -350,7 +451,47 @@
         const userList = document.getElementById('pixiv-follow-gray-user-list');
         enabledInput.checked = state.enabled;
         userList.value = state.users.join('\n');
+        renderUserList();
         updateCountLabel();
+    }
+
+    function renderUserList() {
+        const container = document.getElementById('pixiv-follow-user-list-container');
+        if (!container) return;
+        const users = getSortedAndFilteredUsers();
+        if (!users.length) {
+            container.innerHTML = '<div style="color:#475569;font-size:12px;padding:8px;">記録したユーザーはありません。</div>';
+            return;
+        }
+        container.innerHTML = users.map((userId) => {
+            return `<div class="user-item" data-user-id="${userId}"><span>${userId}</span><button type="button" class="delete-btn" data-user-id="${userId}">削除</button></div>`;
+        }).join('');
+    }
+
+    function getSortedAndFilteredUsers() {
+        const filter = String(userListFilter || '').trim();
+        const filtered = Array.isArray(state.users) ? state.users.filter((userId) => {
+            if (!filter) return true;
+            return userId.includes(filter);
+        }) : [];
+        return filtered.slice().sort((a, b) => {
+            const aNum = parseInt(a, 10);
+            const bNum = parseInt(b, 10);
+            if (userListSortOrder === 'asc') {
+                return aNum - bNum;
+            }
+            return bNum - aNum;
+        });
+    }
+
+    function removeUserById(userId) {
+        const existing = Array.isArray(state.users) ? state.users : [];
+        const updated = existing.filter((id) => id !== userId);
+        state.users = updated;
+        saveState();
+        loadUiFromState();
+        applyGrayStyle();
+        showUserPageBadge();
     }
 
     function updateCountLabel(appliedCount) {
