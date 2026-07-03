@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v3.1
+// @name         Pixiv管理 開発版v3.2
 // @namespace    https://example.com/userscripts
-// @version      3.1
+// @version      3.2
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -516,12 +516,22 @@
                     img = card.querySelector('img');
                 }
                 if (!img) return;
-                if (targets.has(id)) {
+                if (!state.enabled) {
+                    // 機能が無効なら常に解除
+                    img.classList.remove('pixiv-follow-gray-target');
+                } else if (targets.has(id)) {
                     img.classList.add('pixiv-follow-gray-target');
                 } else {
                     img.classList.remove('pixiv-follow-gray-target');
                 }
             });
+            // カウント更新: followingページでは適用されているアイコン数を数える
+            if (state.enabled) {
+                const applied = document.querySelectorAll('#content .pixiv-follow-gray-target, .pixiv-follow-gray-target').length;
+                updateCountLabel(applied);
+            } else {
+                updateCountLabel(0);
+            }
         } catch (e) {
             // ignore
         }
