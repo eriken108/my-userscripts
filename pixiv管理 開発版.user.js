@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v2.6
+// @name         Pixiv管理 開発版v2.7
 // @namespace    https://example.com/userscripts
-// @version      2.6
+// @version      2.7
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -15,6 +15,7 @@
     const STORAGE_KEY = 'pixiv_follow_gray_users_v1';
     const DEFAULT_STATE = { enabled: true, users: [] };
     let state = loadState();
+    const IS_FOLLOWING_PAGE = /^\/users\/\d+\/following\/?$/.test(location.pathname);
     let observer = null;
     let scheduled = false;
 
@@ -237,6 +238,16 @@
                 autoScanInterval = null;
             }
         });
+
+        // If we're on the user's following page, enable auto behavior by default
+        if (IS_FOLLOWING_PAGE) {
+            try {
+                autoChk.checked = true;
+                autoChk.dispatchEvent(new Event('change'));
+            } catch (e) {
+                // ignore
+            }
+        }
 
         // export / import
         const exportBtn = document.getElementById('pixiv-follow-export-btn');
@@ -485,6 +496,39 @@
             await sleep(interval);
         }
         return null;
+    }
+
+    // フォロー一覧ページからユーザーIDを収集して保存する
+    function importFromFollowingPage() {
+        try {
+            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"]'));
+            const ids = anchors.map(getUserIdFromElement).filter(Boolean);
+            if (!ids.length) return 0;
+            const set = new Set(state.users || []);
+            let added = 0;
+            ids.forEach(id => {
+                if (!set.has(id)) {
+                    set.add(id);
+                    added += 1;
+                }
+            });
+            state.users = Array.from(set);
+            state.enabled = true;
+            saveState();
+            updateCountLabel();
+            applyGrayStyle();
+            return added;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    // 初期化時、自動的にフォロー一覧ページなら取り込む
+    if (IS_FOLLOWING_PAGE) {
+        // give the page a moment to render
+        setTimeout(() => {
+            importFromFollowingPage();
+        }, 600);
     }
 
     // エクスポート/インポート
