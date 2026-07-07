@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.1
+// @name         動画既読 開発版3.4.2
 // @namespace    https://missav.ai/
-// @version      3.4.1
+// @version      3.4.2
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -152,7 +152,6 @@
     const readAt = baseState.readAt ?? baseState.added ?? fallbackTimestamp;
     const nextState = {
       ...baseState,
-      added: baseState.added ?? readAt,
       readAt,
     };
 
@@ -160,6 +159,7 @@
       nextState.favAt = baseState.favAt ?? readAt;
     }
 
+    delete nextState.added;
     return nextState;
   }
 
@@ -713,13 +713,22 @@
 
           const orderedUrls = [...videoData.keys()];
           const transformedObj = Object.fromEntries(orderedUrls.map((u, idx) => {
-            const state = Object.assign({}, videoData.get(u) || {});
-            if (state.added !== undefined && state.added !== null) {
-              state.added = formatDateForExport(state.added);
+            const state = normalizeStoredState(videoData.get(u) || {}, Date.now());
+            const exportState = Object.assign({}, state);
+            if (exportState.readAt !== undefined && exportState.readAt !== null) {
+              exportState.readAt = formatDateForExport(exportState.readAt);
+            } else {
+              delete exportState.readAt;
             }
+            if (exportState.favAt !== undefined && exportState.favAt !== null) {
+              exportState.favAt = formatDateForExport(exportState.favAt);
+            } else {
+              delete exportState.favAt;
+            }
+            delete exportState.added;
             // display-only numbering inside each entry
-            state.no = idx + 1;
-            return [u, state];
+            exportState.no = idx + 1;
+            return [u, exportState];
           }));
 
           // Compute export timestamp used for filename
@@ -797,16 +806,18 @@
             videoData.set(targetUrl, normalizeStoredState({
               ...existing,
               fav: false,
+              readAt: now,
             }, now));
           }
         }
 
         if (kind === 'fav') {
-          const state = videoData.get(targetUrl) || { fav: false, added: Date.now() };
+          const state = videoData.get(targetUrl) || { fav: false };
           const now = Date.now();
           const nextState = normalizeStoredState({
             ...state,
             fav: !state.fav,
+            readAt: state.readAt ?? now,
           }, now);
           if (!state.fav) {
             nextState.favAt = now;
