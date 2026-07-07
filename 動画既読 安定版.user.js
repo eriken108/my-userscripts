@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 安定版v3.4.0
+// @name         動画既読 安定版3.4.2
 // @namespace    https://missav.ai/
-// @version      3.4.0
+// @version      3.4.2
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -145,6 +145,34 @@
 
   function reloadData() {
     videoData = loadVideoData();
+  }
+
+  function normalizeStoredState(state, fallbackTimestamp = Date.now()) {
+    const baseState = state && typeof state === 'object' ? { ...state } : {};
+    const readAt = baseState.readAt ?? baseState.added ?? fallbackTimestamp;
+    const nextState = {
+      ...baseState,
+      readAt,
+    };
+
+    if (baseState.fav || baseState.favAt) {
+      nextState.favAt = baseState.favAt ?? readAt;
+    }
+
+    delete nextState.added;
+    return nextState;
+  }
+
+  function getReadTimestamp(state) {
+    return normalizeStoredState(state).readAt ?? null;
+  }
+
+  function getFavTimestamp(state) {
+    return normalizeStoredState(state).favAt ?? normalizeStoredState(state).readAt ?? null;
+  }
+
+  function getDisplayTimestamp(state) {
+    return state?.fav ? getFavTimestamp(state) : getReadTimestamp(state);
   }
 
   function injectStyles() {
@@ -540,15 +568,21 @@
 
             if (!newData.has(n)) {
               // タイムスタンプがないデータにはインポート時の時間を付与
-              newData.set(n, { ...cleanState, added: cleanState.added || Date.now() });
+              const importState = normalizeStoredState(cleanState, Date.now());
+              newData.set(n, importState);
               count++;
             } else if (cleanState.fav && !newData.get(n).fav) {
               const existing = newData.get(n);
-              newData.set(n, { ...existing, fav: true, memo: cleanState.memo || existing.memo });
+              newData.set(n, {
+                ...normalizeStoredState(existing),
+                fav: true,
+                memo: cleanState.memo || existing.memo,
+                favAt: cleanState.favAt || existing.favAt || Date.now(),
+              });
               updated++;
             } else if (cleanState.memo && !newData.get(n).memo) {
               const existing = newData.get(n);
-              newData.set(n, { ...existing, memo: cleanState.memo });
+              newData.set(n, { ...normalizeStoredState(existing), memo: cleanState.memo });
             }
           });
 
@@ -679,13 +713,22 @@
 
           const orderedUrls = [...videoData.keys()];
           const transformedObj = Object.fromEntries(orderedUrls.map((u, idx) => {
-            const state = Object.assign({}, videoData.get(u) || {});
-            if (state.added !== undefined && state.added !== null) {
-              state.added = formatDateForExport(state.added);
+            const state = normalizeStoredState(videoData.get(u) || {}, Date.now());
+            const exportState = Object.assign({}, state);
+            if (exportState.readAt !== undefined && exportState.readAt !== null) {
+              exportState.readAt = formatDateForExport(exportState.readAt);
+            } else {
+              delete exportState.readAt;
             }
+            if (exportState.favAt !== undefined && exportState.favAt !== null) {
+              exportState.favAt = formatDateForExport(exportState.favAt);
+            } else {
+              delete exportState.favAt;
+            }
+            delete exportState.added;
             // display-only numbering inside each entry
-            state.no = idx + 1;
-            return [u, state];
+            exportState.no = idx + 1;
+            return [u, exportState];
           }));
 
           // Compute export timestamp used for filename
@@ -758,16 +801,28 @@
           if (videoData.has(targetUrl)) {
             videoData.delete(targetUrl);
           } else {
-            videoData.set(targetUrl, { fav: false, added: Date.now() });
+            const existing = videoData.get(targetUrl) || {};
+            const now = Date.now();
+            videoData.set(targetUrl, normalizeStoredState({
+              ...existing,
+              fav: false,
+              readAt: now,
+            }, now));
           }
         }
 
         if (kind === 'fav') {
-          const state = videoData.get(targetUrl) || { fav: false, added: Date.now() };
-          videoData.set(targetUrl, {
+          const state = videoData.get(targetUrl) || { fav: false };
+          const now = Date.now();
+          const nextState = normalizeStoredState({
             ...state,
             fav: !state.fav,
-          });
+            readAt: state.readAt ?? now,
+          }, now);
+          if (!state.fav) {
+            nextState.favAt = now;
+          }
+          videoData.set(targetUrl, nextState);
         }
 
         saveVideoData(videoData);
@@ -839,8 +894,8 @@
         return 0;
       };
 
-      const addedA = toTs(a[1].added);
-      const addedB = toTs(b[1].added);
+      const addedA = toTs(getDisplayTimestamp(a[1]));
+      const addedB = toTs(getDisplayTimestamp(b[1]));
 
       switch (sortOrder) {
         case 'oldest':
@@ -870,7 +925,8 @@
       const slug = url.split('/').pop();
       const status = state.fav ? '★' : '既読';
       const memo = (state.memo && state.memo.trim()) ? '📝' : '';
-      const date = state.added ? new Date(state.added).toLocaleDateString() : '日付不明';
+      const displayTimestamp = getDisplayTimestamp(state);
+      const date = displayTimestamp ? new Date(displayTimestamp).toLocaleDateString() : '日付不明';
 
       item.innerHTML = `
         <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${slug}</span>
