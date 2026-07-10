@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.3
+// @name         動画既読 開発版3.4.4
 // @namespace    https://missav.ai/
-// @version      3.4.3
+// @version      3.4.4
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -13,9 +13,9 @@
   'use strict';
 
   const DATA_KEY = 'missav-video-data';
+  const SETTINGS_KEY = 'missav-rf-settings';
   const OLD_READ_KEY = 'missav-read-list';
   const OLD_FAV_KEY = 'missav-fav-list';
-  const DISPLAY_FEATURES_KEY = 'missav-display-features-enabled';
 
   const CONTROL_ID = 'missav-rf-controls';
   const STYLE_ID = 'missav-rf-style';
@@ -70,7 +70,10 @@
   let videoData = new Map();
   let observer = null;
   let applyQueued = false;
-  let displayFeaturesEnabled = true;
+  let settings = {
+    showRelatedCards: true,
+    showStatusBadge: true,
+  };
 
   function normalizeUrl(input) {
     if (!input) return null;
@@ -149,22 +152,35 @@
     videoData = loadVideoData();
   }
 
-  function loadDisplaySettings() {
+  function loadSettings() {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      settings = { ...settings };
+      return;
+    }
+
     try {
-      const raw = localStorage.getItem(DISPLAY_FEATURES_KEY);
-      return raw === null ? true : raw === 'true';
-    } catch (_error) {
-      return true;
+      const parsed = JSON.parse(raw);
+      settings = {
+        ...settings,
+        ...parsed,
+      };
+    } catch (error) {
+      console.warn('[MissAV read/fav] 設定の読み込みに失敗しました:', error);
     }
   }
 
-  function saveDisplaySettings(enabled) {
-    localStorage.setItem(DISPLAY_FEATURES_KEY, String(enabled));
+  function saveSettings() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
 
-  function setDisplayFeaturesEnabled(enabled) {
-    displayFeaturesEnabled = enabled;
-    saveDisplaySettings(enabled);
+  function toggleSetting(name) {
+    settings = {
+      ...settings,
+      [name]: !settings[name],
+    };
+    saveSettings();
+    renderSettingsPanel();
     updateControls();
     scheduleApplyRelatedState();
   }
@@ -278,6 +294,24 @@
         display: flex;
         gap: 8px;
         margin-bottom: 8px;
+      }
+
+      #missav-rf-settings-panel {
+        background: rgba(255,255,255,.95);
+        border: 1px solid rgba(0,0,0,.15);
+        border-radius: 8px;
+        display: none;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 8px;
+      }
+
+      #missav-rf-settings-panel button {
+        width: 100%;
+        font-size: 11px !important;
+        justify-content: center;
+        padding: 6px 8px !important;
+        text-align: center;
       }
 
       #missav-rf-video-list-controls input {
@@ -659,12 +693,13 @@
           </div>
           <div id="missav-rf-video-list"></div>
         </div>
+        <div id="missav-rf-settings-panel">
+          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
+          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
+        </div>
         <div id="missav-rf-button-group">
           <div data-kind="stats" style="font-size: 11px !important; color: #fff !important; text-align: center; padding: 2px 0; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8) !important;"></div>
           <textarea data-kind="memo" placeholder="メモを入力..." rows="1"></textarea>
-          <div id="missav-rf-settings-panel" style="display: none; margin-top: 4px; padding: 6px 8px; background: rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.18); border-radius: 6px;">
-            <button type="button" data-kind="display-toggle" aria-pressed="true">表示機能: ON</button>
-          </div>
           <button type="button" data-kind="read" aria-pressed="false">既読</button>
           <button type="button" data-kind="fav" aria-pressed="false">お気に入り</button>
           <button type="button" data-kind="settings" aria-expanded="false" title="同期設定">⚙️ 設定</button>
@@ -704,6 +739,14 @@
           const filter = button.dataset.filter;
           if (filter) {
             renderVideoList(undefined, undefined, filter);
+          }
+          return;
+        }
+
+        if (button.closest('#missav-rf-settings-panel')) {
+          const settingName = button.dataset.setting;
+          if (settingName) {
+            toggleSetting(settingName);
           }
           return;
         }
@@ -787,11 +830,6 @@
           return;
         }
 
-        if (kind === 'display-toggle') {
-          setDisplayFeaturesEnabled(!displayFeaturesEnabled);
-          return;
-        }
-
         if (kind === 'clear') {
           const isConfirming = button.getAttribute('data-confirming') === 'true';
 
@@ -862,6 +900,21 @@
     }
 
     updateControls();
+  }
+
+  function renderSettingsPanel() {
+    const panel = document.getElementById('missav-rf-settings-panel');
+    if (!panel) return;
+
+    [...panel.querySelectorAll('button[data-setting]')].forEach((button) => {
+      const settingName = button.dataset.setting;
+      if (!settingName) return;
+      const enabled = Boolean(settings[settingName]);
+      button.dataset.active = String(enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      const label = settingName === 'showRelatedCards' ? '関連動画表示' : 'ステータス表示';
+      button.textContent = `${label}: ${enabled ? 'ON' : 'OFF'}`;
+    });
   }
 
   function renderVideoList(newSortOrder, newSearchTerm, newFilter) {
@@ -990,8 +1043,6 @@
     const favButton = controls.querySelector('[data-kind="fav"]');
     const stats = controls.querySelector('[data-kind="stats"]');
     const memoArea = controls.querySelector('[data-kind="memo"]');
-    const settingsPanel = controls.querySelector('#missav-rf-settings-panel');
-    const displayToggleButton = controls.querySelector('[data-kind="display-toggle"]');
     const statusBadge = document.getElementById(STATUS_BADGE_ID);
 
     const state = videoData.get(currentUrl);
@@ -1003,16 +1054,6 @@
     }
 
     setButtonState(readButton, !!state, '既読');
-
-    if (settingsPanel) {
-      settingsPanel.style.display = 'none';
-    }
-
-    if (displayToggleButton) {
-      displayToggleButton.dataset.active = String(displayFeaturesEnabled);
-      displayToggleButton.setAttribute('aria-pressed', String(displayFeaturesEnabled));
-      displayToggleButton.textContent = `表示機能: ${displayFeaturesEnabled ? 'ON' : 'OFF'}`;
-    }
 
     if (memoArea) {
       memoArea.style.display = state?.fav ? 'block' : 'none';
@@ -1034,7 +1075,7 @@
     }
 
     if (statusBadge) {
-      if (state) {
+      if (state && settings.showStatusBadge) {
         statusBadge.style.display = 'block';
         statusBadge.innerHTML = state.fav
           ? '<div class="missav-rf-status-floating-item">★ お気に入り済み</div>'
@@ -1163,15 +1204,14 @@
   function applyRelatedState() {
     if (!isVideoPage()) return;
 
-    if (!displayFeaturesEnabled) {
-      document.querySelectorAll('[data-missav-rf-card]').forEach((card) => clearCardState(card));
-      return;
-    }
-
     const containers = findRelatedContainers();
     for (const container of containers) {
       for (const card of getCards(container)) {
-        applyCardState(card);
+        if (settings.showRelatedCards) {
+          applyCardState(card);
+        } else {
+          clearCardState(card);
+        }
       }
     }
   }
@@ -1201,9 +1241,10 @@
 
   function boot() {
     reloadData();
-    displayFeaturesEnabled = loadDisplaySettings();
+    loadSettings();
     injectStyles();
     setupControls();
+    renderSettingsPanel();
     applyRelatedState();
     startObserver();
   }
@@ -1216,11 +1257,19 @@
 
   window.addEventListener('load', boot, { once: true });
   window.addEventListener('storage', (event) => {
-    if (event.key !== DATA_KEY) return;
-    reloadData();
-    updateControls();
-    if (document.getElementById('missav-rf-video-list-container')?.style.display === 'block') renderVideoList();
-    scheduleApplyRelatedState();
+    if (event.key === DATA_KEY) {
+      reloadData();
+      updateControls();
+      if (document.getElementById('missav-rf-video-list-container')?.style.display === 'block') renderVideoList();
+      scheduleApplyRelatedState();
+      return;
+    }
+    if (event.key === SETTINGS_KEY) {
+      loadSettings();
+      renderSettingsPanel();
+      updateControls();
+      scheduleApplyRelatedState();
+    }
   });
 
   for (const delay of [500, 1500, 3000, 6000]) {
