@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.4
+// @name         動画既読 開発版3.4.5
 // @namespace    https://missav.ai/
-// @version      3.4.4
+// @version      3.4.5
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -693,10 +693,6 @@
           </div>
           <div id="missav-rf-video-list"></div>
         </div>
-        <div id="missav-rf-settings-panel">
-          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
-          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
-        </div>
         <div id="missav-rf-button-group">
           <div data-kind="stats" style="font-size: 11px !important; color: #fff !important; text-align: center; padding: 2px 0; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8) !important;"></div>
           <textarea data-kind="memo" placeholder="メモを入力..." rows="1"></textarea>
@@ -706,6 +702,10 @@
           <button type="button" data-kind="export" style="display: none; font-size: 12px !important;" title="この端末のデータをファイルに保存">同期(保存)</button>
           <button type="button" data-kind="import" style="display: none; font-size: 12px !important;" title="保存したファイルを読み込み">同期(読込)</button>
           <button type="button" data-kind="clear" style="display: none; font-size: 12px !important; color: #d32f2f !important;" title="すべてのデータを消去">データを全消去</button>
+        </div>
+        <div id="missav-rf-settings-panel" style="display: none;">
+          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
+          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
         </div>
       `;
       document.body.appendChild(controls);
