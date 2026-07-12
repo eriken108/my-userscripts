@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 安定版3.4.2
+// @name         動画既読 安定版3.4.9
 // @namespace    https://missav.ai/
-// @version      3.4.2
+// @version      3.4.9
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -13,6 +13,7 @@
   'use strict';
 
   const DATA_KEY = 'missav-video-data';
+  const SETTINGS_KEY = 'missav-rf-settings';
   const OLD_READ_KEY = 'missav-read-list';
   const OLD_FAV_KEY = 'missav-fav-list';
 
@@ -69,6 +70,10 @@
   let videoData = new Map();
   let observer = null;
   let applyQueued = false;
+  let settings = {
+    showRelatedCards: true,
+    showStatusBadge: true,
+  };
 
   function normalizeUrl(input) {
     if (!input) return null;
@@ -145,6 +150,39 @@
 
   function reloadData() {
     videoData = loadVideoData();
+  }
+
+  function loadSettings() {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      settings = { ...settings };
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      settings = {
+        ...settings,
+        ...parsed,
+      };
+    } catch (error) {
+      console.warn('[MissAV read/fav] 設定の読み込みに失敗しました:', error);
+    }
+  }
+
+  function saveSettings() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function toggleSetting(name) {
+    settings = {
+      ...settings,
+      [name]: !settings[name],
+    };
+    saveSettings();
+    renderSettingsPanel();
+    updateControls();
+    scheduleApplyRelatedState();
   }
 
   function normalizeStoredState(state, fallbackTimestamp = Date.now()) {
@@ -258,6 +296,30 @@
         margin-bottom: 8px;
       }
 
+      #missav-rf-left-column {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #missav-rf-settings-panel {
+        background: rgba(255,255,255,.95);
+        border: 1px solid rgba(0,0,0,.15);
+        border-radius: 8px;
+        display: none;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 8px;
+      }
+
+      #missav-rf-settings-panel button {
+        width: 100%;
+        font-size: 11px !important;
+        justify-content: center;
+        padding: 6px 8px !important;
+        text-align: center;
+      }
+
       #missav-rf-video-list-controls input {
         flex-grow: 1;
         font-size: 11px !important;
@@ -286,6 +348,11 @@
           max-width: calc(100vw - 32px);
         }
 
+        #missav-rf-left-column {
+          align-items: flex-end;
+          width: 100%;
+        }
+
         #missav-rf-button-group {
           width: auto;
           align-items: flex-end;
@@ -296,6 +363,14 @@
           max-width: calc((100vw - 32px) * 0.72);
           align-self: flex-end;
           transform: translateX(10%);
+        }
+
+        #missav-rf-settings-panel {
+          width: calc((100vw - 32px) * 0.55);
+          max-width: calc((100vw - 32px) * 0.55);
+          align-self: flex-end;
+          transform: translateX(18%);
+          box-sizing: border-box;
         }
 
         #missav-rf-video-list-controls {
@@ -620,22 +695,28 @@
       controls = document.createElement('div');
       controls.id = CONTROL_ID;
       controls.innerHTML = `
-        <div id="missav-rf-video-list-container" style="display: none;">
-          <div id="missav-rf-video-list-controls" style="flex-wrap: wrap; display: flex; gap: 8px;">
-            <input type="search" id="missav-rf-list-search" placeholder="検索..." style="width: 100%; margin-bottom: 4px;">
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-              <button type="button" data-filter="all" data-active="true">すべて</button>
-              <button type="button" data-filter="fav">★のみ</button>
-              <button type="button" data-filter="read">既読のみ</button>
+        <div id="missav-rf-left-column">
+          <div id="missav-rf-video-list-container" style="display: none;">
+            <div id="missav-rf-video-list-controls" style="flex-wrap: wrap; display: flex; gap: 8px;">
+              <input type="search" id="missav-rf-list-search" placeholder="検索..." style="width: 100%; margin-bottom: 4px;">
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button type="button" data-filter="all" data-active="true">すべて</button>
+                <button type="button" data-filter="fav">★のみ</button>
+                <button type="button" data-filter="read">既読のみ</button>
+              </div>
+              <div style="display: flex; gap: 4px; border-left: 1px solid #ccc; padding-left: 8px; flex-wrap: wrap;">
+                <button type="button" data-sort="newest" data-active="true">新着順</button>
+                <button type="button" data-sort="oldest">古い順</button>
+                <button type="button" data-sort="id-asc">ID昇順</button>
+                <button type="button" data-sort="id-desc">ID降順</button>
+              </div>
             </div>
-            <div style="display: flex; gap: 4px; border-left: 1px solid #ccc; padding-left: 8px; flex-wrap: wrap;">
-              <button type="button" data-sort="newest" data-active="true">新着順</button>
-              <button type="button" data-sort="oldest">古い順</button>
-              <button type="button" data-sort="id-asc">ID昇順</button>
-              <button type="button" data-sort="id-desc">ID降順</button>
-            </div>
+            <div id="missav-rf-video-list"></div>
           </div>
-          <div id="missav-rf-video-list"></div>
+          <div id="missav-rf-settings-panel">
+            <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
+            <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
+          </div>
         </div>
         <div id="missav-rf-button-group">
           <div data-kind="stats" style="font-size: 11px !important; color: #fff !important; text-align: center; padding: 2px 0; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8) !important;"></div>
@@ -683,6 +764,14 @@
           return;
         }
 
+        if (button.closest('#missav-rf-settings-panel')) {
+          const settingName = button.dataset.setting;
+          if (settingName) {
+            toggleSetting(settingName);
+          }
+          return;
+        }
+
         const kind = button.dataset.kind;
         if (!kind) return;
 
@@ -690,7 +779,7 @@
           const isExpanded = button.getAttribute('aria-expanded') === 'true';
           const newState = !isExpanded;
           button.setAttribute('aria-expanded', String(newState));
-          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container').forEach(el => {
+          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container, #missav-rf-settings-panel').forEach(el => {
             el.style.display = newState ? 'block' : 'none';
           });
           if (newState) {
@@ -832,6 +921,21 @@
     }
 
     updateControls();
+  }
+
+  function renderSettingsPanel() {
+    const panel = document.getElementById('missav-rf-settings-panel');
+    if (!panel) return;
+
+    [...panel.querySelectorAll('button[data-setting]')].forEach((button) => {
+      const settingName = button.dataset.setting;
+      if (!settingName) return;
+      const enabled = Boolean(settings[settingName]);
+      button.dataset.active = String(enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      const label = settingName === 'showRelatedCards' ? '関連動画表示' : 'ステータス表示';
+      button.textContent = `${label}: ${enabled ? 'ON' : 'OFF'}`;
+    });
   }
 
   function renderVideoList(newSortOrder, newSearchTerm, newFilter) {
@@ -992,7 +1096,7 @@
     }
 
     if (statusBadge) {
-      if (state) {
+      if (state && settings.showStatusBadge) {
         statusBadge.style.display = 'block';
         statusBadge.innerHTML = state.fav
           ? '<div class="missav-rf-status-floating-item">★ お気に入り済み</div>'
@@ -1124,7 +1228,11 @@
     const containers = findRelatedContainers();
     for (const container of containers) {
       for (const card of getCards(container)) {
-        applyCardState(card);
+        if (settings.showRelatedCards) {
+          applyCardState(card);
+        } else {
+          clearCardState(card);
+        }
       }
     }
   }
@@ -1154,8 +1262,10 @@
 
   function boot() {
     reloadData();
+    loadSettings();
     injectStyles();
     setupControls();
+    renderSettingsPanel();
     applyRelatedState();
     startObserver();
   }
@@ -1168,11 +1278,19 @@
 
   window.addEventListener('load', boot, { once: true });
   window.addEventListener('storage', (event) => {
-    if (event.key !== DATA_KEY) return;
-    reloadData();
-    updateControls();
-    if (document.getElementById('missav-rf-video-list-container')?.style.display === 'block') renderVideoList();
-    scheduleApplyRelatedState();
+    if (event.key === DATA_KEY) {
+      reloadData();
+      updateControls();
+      if (document.getElementById('missav-rf-video-list-container')?.style.display === 'block') renderVideoList();
+      scheduleApplyRelatedState();
+      return;
+    }
+    if (event.key === SETTINGS_KEY) {
+      loadSettings();
+      renderSettingsPanel();
+      updateControls();
+      scheduleApplyRelatedState();
+    }
   });
 
   for (const delay of [500, 1500, 3000, 6000]) {
