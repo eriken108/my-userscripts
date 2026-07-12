@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.5
+// @name         動画既読 開発版3.4.6
 // @namespace    https://missav.ai/
-// @version      3.4.5
+// @version      3.4.6
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -220,19 +220,24 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${CONTROL_ID} {
-        align-items: flex-end;
+        align-items: flex-start;
         bottom: 16px;
-        display: flex;
+        display: grid;
         gap: 8px;
+        grid-template-columns: minmax(0, 1fr) auto;
         position: fixed;
         right: 16px;
         z-index: 2147483647 !important;
       }
 
       #missav-rf-button-group {
+        align-self: end;
         display: flex;
         flex-direction: column-reverse;
         gap: 8px;
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        justify-self: end;
       }
 
       #${CONTROL_ID} > div {
@@ -280,14 +285,16 @@
         border: 1px solid rgba(0,0,0,.2);
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,.1);
+        box-sizing: border-box;
+        grid-column: 1;
+        grid-row: 1;
+        margin-top: 0;
         max-height: 40vh;
         overflow-y: auto;
-        width: min(350px, calc(100vw - 32px));
-        box-sizing: border-box;
+        padding: 8px;
         touch-action: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        padding: 8px;
-        margin-top: 8px;
+        width: min(350px, calc(100vw - 32px));
       }
 
       #missav-rf-video-list-controls {
@@ -301,9 +308,13 @@
         border: 1px solid rgba(0,0,0,.15);
         border-radius: 8px;
         display: none;
+        flex-direction: column;
         gap: 6px;
-        margin-top: 8px;
+        grid-column: 1;
+        grid-row: 2;
+        margin-top: 0;
         padding: 8px;
+        width: min(260px, calc(100vw - 32px));
       }
 
       #missav-rf-settings-panel button {
@@ -336,6 +347,7 @@
       @media (max-width: 767px) {
         #missav-rf-controls {
           align-items: flex-end;
+          grid-template-columns: minmax(0, 1fr);
           left: 16px !important;
           right: 16px !important;
           justify-content: flex-end;
@@ -343,6 +355,10 @@
         }
 
         #missav-rf-button-group {
+          align-self: end;
+          grid-column: 1;
+          grid-row: 3;
+          justify-self: end;
           width: auto;
           align-items: flex-end;
         }
@@ -758,9 +774,13 @@
           const isExpanded = button.getAttribute('aria-expanded') === 'true';
           const newState = !isExpanded;
           button.setAttribute('aria-expanded', String(newState));
-          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container, #missav-rf-settings-panel').forEach(el => {
+          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container').forEach(el => {
             el.style.display = newState ? 'block' : 'none';
           });
+          const settingsPanel = document.getElementById('missav-rf-settings-panel');
+          if (settingsPanel) {
+            settingsPanel.style.display = newState ? 'flex' : 'none';
+          }
           if (newState) {
             renderVideoList();
           }
