@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.6
+// @name         動画既読 開発版3.4.7
 // @namespace    https://missav.ai/
-// @version      3.4.6
+// @version      3.4.7
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -220,24 +220,22 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${CONTROL_ID} {
-        align-items: flex-start;
+        align-items: flex-end;
         bottom: 16px;
-        display: grid;
+        display: flex;
         gap: 8px;
-        grid-template-columns: minmax(0, 1fr) auto;
+        justify-content: flex-end;
+        left: 16px;
         position: fixed;
         right: 16px;
         z-index: 2147483647 !important;
       }
 
       #missav-rf-button-group {
-        align-self: end;
         display: flex;
         flex-direction: column-reverse;
         gap: 8px;
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        justify-self: end;
+        margin-left: auto;
       }
 
       #${CONTROL_ID} > div {
@@ -285,16 +283,15 @@
         border: 1px solid rgba(0,0,0,.2);
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,.1);
-        box-sizing: border-box;
-        grid-column: 1;
-        grid-row: 1;
-        margin-top: 0;
         max-height: 40vh;
         overflow-y: auto;
-        padding: 8px;
+        width: min(350px, calc(100vw - 32px));
+        box-sizing: border-box;
         touch-action: auto !important;
         -webkit-overflow-scrolling: touch !important;
-        width: min(350px, calc(100vw - 32px));
+        padding: 8px;
+        margin-top: 8px;
+        margin-right: auto;
       }
 
       #missav-rf-video-list-controls {
@@ -308,13 +305,11 @@
         border: 1px solid rgba(0,0,0,.15);
         border-radius: 8px;
         display: none;
-        flex-direction: column;
         gap: 6px;
-        grid-column: 1;
-        grid-row: 2;
-        margin-top: 0;
+        margin-top: 8px;
+        margin-left: auto;
         padding: 8px;
-        width: min(260px, calc(100vw - 32px));
+        width: min(220px, calc(100vw - 32px));
       }
 
       #missav-rf-settings-panel button {
@@ -347,7 +342,6 @@
       @media (max-width: 767px) {
         #missav-rf-controls {
           align-items: flex-end;
-          grid-template-columns: minmax(0, 1fr);
           left: 16px !important;
           right: 16px !important;
           justify-content: flex-end;
@@ -355,10 +349,6 @@
         }
 
         #missav-rf-button-group {
-          align-self: end;
-          grid-column: 1;
-          grid-row: 3;
-          justify-self: end;
           width: auto;
           align-items: flex-end;
         }
@@ -709,6 +699,10 @@
           </div>
           <div id="missav-rf-video-list"></div>
         </div>
+        <div id="missav-rf-settings-panel" style="display: none;">
+          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
+          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
+        </div>
         <div id="missav-rf-button-group">
           <div data-kind="stats" style="font-size: 11px !important; color: #fff !important; text-align: center; padding: 2px 0; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8) !important;"></div>
           <textarea data-kind="memo" placeholder="メモを入力..." rows="1"></textarea>
@@ -718,10 +712,6 @@
           <button type="button" data-kind="export" style="display: none; font-size: 12px !important;" title="この端末のデータをファイルに保存">同期(保存)</button>
           <button type="button" data-kind="import" style="display: none; font-size: 12px !important;" title="保存したファイルを読み込み">同期(読込)</button>
           <button type="button" data-kind="clear" style="display: none; font-size: 12px !important; color: #d32f2f !important;" title="すべてのデータを消去">データを全消去</button>
-        </div>
-        <div id="missav-rf-settings-panel" style="display: none;">
-          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
-          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
         </div>
       `;
       document.body.appendChild(controls);
@@ -774,13 +764,9 @@
           const isExpanded = button.getAttribute('aria-expanded') === 'true';
           const newState = !isExpanded;
           button.setAttribute('aria-expanded', String(newState));
-          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container').forEach(el => {
+          document.querySelectorAll('#missav-rf-button-group [data-kind="import"], #missav-rf-button-group [data-kind="export"], #missav-rf-button-group [data-kind="clear"], #missav-rf-video-list-container, #missav-rf-settings-panel').forEach(el => {
             el.style.display = newState ? 'block' : 'none';
           });
-          const settingsPanel = document.getElementById('missav-rf-settings-panel');
-          if (settingsPanel) {
-            settingsPanel.style.display = newState ? 'flex' : 'none';
-          }
           if (newState) {
             renderVideoList();
           }
