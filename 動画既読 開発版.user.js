@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         動画既読 開発版3.4.7
+// @name         動画既読 開発版3.4.8
 // @namespace    https://missav.ai/
-// @version      3.4.7
+// @version      3.4.8
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
@@ -224,8 +224,6 @@
         bottom: 16px;
         display: flex;
         gap: 8px;
-        justify-content: flex-end;
-        left: 16px;
         position: fixed;
         right: 16px;
         z-index: 2147483647 !important;
@@ -235,7 +233,6 @@
         display: flex;
         flex-direction: column-reverse;
         gap: 8px;
-        margin-left: auto;
       }
 
       #${CONTROL_ID} > div {
@@ -291,7 +288,6 @@
         -webkit-overflow-scrolling: touch !important;
         padding: 8px;
         margin-top: 8px;
-        margin-right: auto;
       }
 
       #missav-rf-video-list-controls {
@@ -307,9 +303,7 @@
         display: none;
         gap: 6px;
         margin-top: 8px;
-        margin-left: auto;
         padding: 8px;
-        width: min(220px, calc(100vw - 32px));
       }
 
       #missav-rf-settings-panel button {
@@ -682,26 +676,28 @@
       controls = document.createElement('div');
       controls.id = CONTROL_ID;
       controls.innerHTML = `
-        <div id="missav-rf-video-list-container" style="display: none;">
-          <div id="missav-rf-video-list-controls" style="flex-wrap: wrap; display: flex; gap: 8px;">
-            <input type="search" id="missav-rf-list-search" placeholder="検索..." style="width: 100%; margin-bottom: 4px;">
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-              <button type="button" data-filter="all" data-active="true">すべて</button>
-              <button type="button" data-filter="fav">★のみ</button>
-              <button type="button" data-filter="read">既読のみ</button>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div id="missav-rf-video-list-container" style="display: none;">
+            <div id="missav-rf-video-list-controls" style="flex-wrap: wrap; display: flex; gap: 8px;">
+              <input type="search" id="missav-rf-list-search" placeholder="検索..." style="width: 100%; margin-bottom: 4px;">
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button type="button" data-filter="all" data-active="true">すべて</button>
+                <button type="button" data-filter="fav">★のみ</button>
+                <button type="button" data-filter="read">既読のみ</button>
+              </div>
+              <div style="display: flex; gap: 4px; border-left: 1px solid #ccc; padding-left: 8px; flex-wrap: wrap;">
+                <button type="button" data-sort="newest" data-active="true">新着順</button>
+                <button type="button" data-sort="oldest">古い順</button>
+                <button type="button" data-sort="id-asc">ID昇順</button>
+                <button type="button" data-sort="id-desc">ID降順</button>
+              </div>
             </div>
-            <div style="display: flex; gap: 4px; border-left: 1px solid #ccc; padding-left: 8px; flex-wrap: wrap;">
-              <button type="button" data-sort="newest" data-active="true">新着順</button>
-              <button type="button" data-sort="oldest">古い順</button>
-              <button type="button" data-sort="id-asc">ID昇順</button>
-              <button type="button" data-sort="id-desc">ID降順</button>
-            </div>
+            <div id="missav-rf-video-list"></div>
           </div>
-          <div id="missav-rf-video-list"></div>
-        </div>
-        <div id="missav-rf-settings-panel" style="display: none;">
-          <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
-          <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
+          <div id="missav-rf-settings-panel">
+            <button type="button" data-setting="showRelatedCards" data-active="true">関連動画表示: ON</button>
+            <button type="button" data-setting="showStatusBadge" data-active="true">ステータス表示: ON</button>
+          </div>
         </div>
         <div id="missav-rf-button-group">
           <div data-kind="stats" style="font-size: 11px !important; color: #fff !important; text-align: center; padding: 2px 0; font-weight: bold; text-shadow: 0 1px 3px rgba(0,0,0,0.8) !important;"></div>
