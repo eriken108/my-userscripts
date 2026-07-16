@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.7
+// @name         Pixiv管理 開発版v4.0.8
 // @namespace    https://example.com/userscripts
-// @version      4.0.7
+// @version      4.0.8
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -311,61 +311,59 @@
                     bottom: 14px;
                 }
             }
-            /* PC layout responsive design for mobile screens */
-            @media (max-width: 1024px) {
-                .pixiv-mobile-layout-active,
-                .pixiv-mobile-layout-active body,
-                .pixiv-mobile-layout-active #root,
-                .pixiv-mobile-layout-active #app-mount-point {
-                    min-width: unset !important;
-                    width: 100% !important;
-                    overflow-x: hidden !important;
-                }
-                .pixiv-mobile-layout-active main {
-                    width: 100% !important;
-                    min-width: unset !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
-                }
-                /* Main columns container (illustration + sidebar) */
-                .pixiv-mobile-layout-active main > div {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    width: 100% !important;
-                    padding: 0 !important;
-                }
-                /* Illustration area and sidebar area */
-                .pixiv-mobile-layout-active main > div > div {
-                    width: 100% !important;
-                    max-width: 100% !important;
-                    margin: 0 !important;
-                    padding: 8px !important;
-                    box-sizing: border-box !important;
-                }
-                /* Image adjustments */
-                .pixiv-mobile-layout-active main img {
-                    max-width: 100% !important;
-                    height: auto !important;
-                    object-fit: contain !important;
-                }
-                /* Header / Nav area */
-                .pixiv-mobile-layout-active header {
-                    width: 100% !important;
-                    min-width: unset !important;
-                    padding: 0 8px !important;
-                }
-                /* Target grids to be 2 columns on mobile screens */
-                .pixiv-mobile-layout-active div[style*="grid-template-columns"], 
-                .pixiv-mobile-layout-active ul[style*="grid-template-columns"] {
-                    grid-template-columns: repeat(2, 1fr) !important;
-                    gap: 8px !important;
-                }
-                /* Common Pixiv PC recommendation grid classes */
-                .pixiv-mobile-layout-active [class*="Grid"], 
-                .pixiv-mobile-layout-active [class*="grid"] {
-                    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-                    gap: 8px !important;
-                }
+            /* PC layout responsive design for mobile screens (unconditional when active) */
+            .pixiv-mobile-layout-active,
+            .pixiv-mobile-layout-active body,
+            .pixiv-mobile-layout-active #root,
+            .pixiv-mobile-layout-active #app-mount-point {
+                min-width: unset !important;
+                width: 100% !important;
+                overflow-x: hidden !important;
+            }
+            .pixiv-mobile-layout-active main {
+                width: 100% !important;
+                min-width: unset !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            /* Main columns container (illustration + sidebar) */
+            .pixiv-mobile-layout-active main > div {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            /* Illustration area and sidebar area */
+            .pixiv-mobile-layout-active main > div > div {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 8px !important;
+                box-sizing: border-box !important;
+            }
+            /* Image adjustments */
+            .pixiv-mobile-layout-active main img {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain !important;
+            }
+            /* Header / Nav area */
+            .pixiv-mobile-layout-active header {
+                width: 100% !important;
+                min-width: unset !important;
+                padding: 0 8px !important;
+            }
+            /* Target grids to be 2 columns on mobile screens */
+            .pixiv-mobile-layout-active div[style*="grid-template-columns"], 
+            .pixiv-mobile-layout-active ul[style*="grid-template-columns"] {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px !important;
+            }
+            /* Common Pixiv PC recommendation grid classes */
+            .pixiv-mobile-layout-active [class*="Grid"], 
+            .pixiv-mobile-layout-active [class*="grid"] {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+                gap: 8px !important;
             }
         `;
         document.head.appendChild(style);
