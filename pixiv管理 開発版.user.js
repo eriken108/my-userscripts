@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.1
+// @name         Pixiv管理 開発版v4.0.2
 // @namespace    https://example.com/userscripts
-// @version      4.0.1
+// @version      4.0.2
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -615,15 +615,15 @@
     function applyGrayStyle() {
         removeGrayStyleFromAll();
 
-        if (!/^\/artworks\//.test(location.pathname) || !state.enabled || !state.users.length) {
+        if (!/\/artworks\//.test(location.pathname) || !state.enabled || !state.users.length) {
             updateCountLabel(0);
             return;
         }
 
-        const relatedSection = findRelatedWorksSection();
+        let relatedSection = findRelatedWorksSection();
         if (!relatedSection) {
-            updateCountLabel(0);
-            return;
+            // Fallback to document.body if related works section cannot be determined (especially on mobile)
+            relatedSection = document.body;
         }
 
         const targets = new Set(state.users);
@@ -701,6 +701,10 @@
         let current = node.parentElement;
 
         while (current && current !== document.body) {
+            // Find parent containing work link (works on both PC & mobile)
+            if (current.querySelector('a[href*="/artworks/"]')) {
+                return current;
+            }
             const media = Array.from(current.querySelectorAll('img, video, picture, canvas'));
             const outsideMedia = media.filter((el) => !node.contains(el));
             if (outsideMedia.length > 0) {
@@ -729,7 +733,7 @@
     }
 
     async function scanAndAutoSave() {
-        if (!/^\/artworks\//.test(location.pathname)) return;
+        if (!/\/artworks\//.test(location.pathname)) return;
         const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]'));
         let added = 0;
         for (const node of relatedNodes) {
