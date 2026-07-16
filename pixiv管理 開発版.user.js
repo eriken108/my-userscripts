@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.5
+// @name         Pixiv管理 開発版v4.0.6
 // @namespace    https://example.com/userscripts
-// @version      4.0.5
+// @version      4.0.6
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -14,7 +14,7 @@
     'use strict';
 
     const STORAGE_KEY = 'pixiv_follow_gray_users_v1';
-    const DEFAULT_STATE = { enabled: true, users: [] };
+    const DEFAULT_STATE = { enabled: true, users: [], mobileLayout: false };
     let state = loadState();
     const IS_FOLLOWING_PAGE = /^\/users\/\d+\/following\/?$/.test(location.pathname) || (/^\/bookmark\.php$/.test(location.pathname) && /[?&]type=user/.test(location.search));
     const IS_USER_PAGE = /^\/users\/(\d+)\/?$/.test(location.pathname) || (/^\/member\.php$/.test(location.pathname) && /[?&]id=\d+/.test(location.search));
@@ -23,8 +23,57 @@
     let userListSortOrder = 'asc';
     let userListFilter = '';
 
+    // Memory cache for mapping artwork ID to user ID
+    const illustToUserMap = new Map();
+
+    // Intercept fetch to gather artwork-to-user mappings
+    const originalFetch = window.fetch;
+    window.fetch = async function (...args) {
+        const response = await originalFetch.apply(this, args);
+        try {
+            const clone = response.clone();
+            clone.json().then(data => {
+                extractMappings(data);
+            }).catch(() => {});
+        } catch (e) {}
+        return response;
+    };
+
+    function extractMappings(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) {
+            obj.forEach(extractMappings);
+            return;
+        }
+        const id = obj.id || obj.illustId || obj.illust_id;
+        const userId = obj.userId || obj.user_id || obj.authorId;
+        if (id && userId && String(id).match(/^\d+$/) && String(userId).match(/^\d+$/)) {
+            illustToUserMap.set(String(id), String(userId));
+        }
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const val = obj[key];
+                if (val && typeof val === 'object') {
+                    extractMappings(val);
+                }
+            }
+        }
+    }
+
+    // Parse preloaded data if any
+    try {
+        const preloadEl = document.getElementById('meta-preload-data');
+        if (preloadEl) {
+            const content = preloadEl.getAttribute('content');
+            if (content) {
+                extractMappings(JSON.parse(content));
+            }
+        }
+    } catch (e) {}
+
     injectStyles();
     createSettingsUI();
+    applyMobileLayoutClass();
     bindEvents();
     applyGrayStyle();
     showUserPageBadge();
@@ -46,7 +95,8 @@
             const parsed = JSON.parse(raw);
             return {
                 enabled: parsed.enabled !== false,
-                users: Array.isArray(parsed.users) ? parsed.users : []
+                users: Array.isArray(parsed.users) ? parsed.users : [],
+                mobileLayout: parsed.mobileLayout === true
             };
         } catch (e) {
             return { ...DEFAULT_STATE };
@@ -261,8 +311,72 @@
                     bottom: 14px;
                 }
             }
+            /* PC layout responsive design for mobile screens */
+            @media (max-width: 1024px) {
+                .pixiv-mobile-layout-active,
+                .pixiv-mobile-layout-active body,
+                .pixiv-mobile-layout-active #root,
+                .pixiv-mobile-layout-active #app-mount-point {
+                    min-width: unset !important;
+                    width: 100% !important;
+                    overflow-x: hidden !important;
+                }
+                .pixiv-mobile-layout-active main {
+                    width: 100% !important;
+                    min-width: unset !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                /* Main columns container (illustration + sidebar) */
+                .pixiv-mobile-layout-active main > div {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    width: 100% !important;
+                    padding: 0 !important;
+                }
+                /* Illustration area and sidebar area */
+                .pixiv-mobile-layout-active main > div > div {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    margin: 0 !important;
+                    padding: 8px !important;
+                    box-sizing: border-box !important;
+                }
+                /* Image adjustments */
+                .pixiv-mobile-layout-active main img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                    object-fit: contain !important;
+                }
+                /* Header / Nav area */
+                .pixiv-mobile-layout-active header {
+                    width: 100% !important;
+                    min-width: unset !important;
+                    padding: 0 8px !important;
+                }
+                /* Target grids to be 2 columns on mobile screens */
+                .pixiv-mobile-layout-active div[style*="grid-template-columns"], 
+                .pixiv-mobile-layout-active ul[style*="grid-template-columns"] {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                    gap: 8px !important;
+                }
+                /* Common Pixiv PC recommendation grid classes */
+                .pixiv-mobile-layout-active [class*="Grid"], 
+                .pixiv-mobile-layout-active [class*="grid"] {
+                    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+                    gap: 8px !important;
+                }
+            }
         `;
         document.head.appendChild(style);
+    }
+
+    function applyMobileLayoutClass() {
+        if (state.mobileLayout) {
+            document.documentElement.classList.add('pixiv-mobile-layout-active');
+        } else {
+            document.documentElement.classList.remove('pixiv-mobile-layout-active');
+        }
     }
 
     function createSettingsUI() {
@@ -281,6 +395,7 @@
         panel.innerHTML = `
             <div class="panel-title">Pixiv 管理</div>
             <label><input id="pixiv-follow-gray-enabled" type="checkbox"> 機能を有効化</label>
+            <label><input id="pixiv-follow-mobile-layout" type="checkbox"> PC版でモバイル表示化</label>
             <div class="count-label" id="pixiv-follow-gray-count">適用ユーザー数: 0人　記録ユーザー数: 0人</div>
             <input id="pixiv-follow-gray-user-list" type="text" placeholder="追加するユーザーIDまたはURLを入力\n例: 12345\nhttps://www.pixiv.net/users/12345"></textarea>
             <div class="list-controls">
@@ -378,6 +493,7 @@
         const toggleBtn = document.getElementById('pixiv-follow-gray-toggle-btn');
         const panel = document.getElementById('pixiv-follow-gray-panel');
         const enabledInput = document.getElementById('pixiv-follow-gray-enabled');
+        const mobileLayoutInput = document.getElementById('pixiv-follow-mobile-layout');
         const userList = document.getElementById('pixiv-follow-gray-user-list');
         const saveBtn = document.getElementById('pixiv-follow-gray-save-btn');
         const loadBtn = document.getElementById('pixiv-follow-gray-load-btn');
@@ -390,6 +506,12 @@
             state.enabled = enabledInput.checked;
             saveState();
             applyGrayStyle();
+        });
+
+        mobileLayoutInput.addEventListener('change', () => {
+            state.mobileLayout = mobileLayoutInput.checked;
+            saveState();
+            applyMobileLayoutClass();
         });
 
         saveBtn.addEventListener('click', () => {
@@ -537,11 +659,14 @@
 
     function loadUiFromState() {
         const enabledInput = document.getElementById('pixiv-follow-gray-enabled');
+        const mobileLayoutInput = document.getElementById('pixiv-follow-mobile-layout');
         const userList = document.getElementById('pixiv-follow-gray-user-list');
         enabledInput.checked = state.enabled;
+        if (mobileLayoutInput) mobileLayoutInput.checked = !!state.mobileLayout;
         userList.value = '';
         renderUserList();
         updateCountLabel();
+        applyMobileLayoutClass();
     }
 
     function renderUserList() {
@@ -589,6 +714,23 @@
         loadUiFromState();
         applyGrayStyle();
         showUserPageBadge();
+    }
+
+    // Parse user ID from node (either PC/Mobile user links or cached illust ID mapping)
+    function getUserIdFromElement(node) {
+        const direct = node.getAttribute('data-user-id') || node.getAttribute('data-user') || node.getAttribute('data-id');
+        if (direct) return String(direct).trim();
+        const href = node.getAttribute('href') || '';
+        let match = href.match(/\/users\/(\d+)/i) || href.match(/member\.php\?.*id=(\d+)/i) || href.match(/[?&]id=(\d+)/i);
+        if (match) return match[1];
+        match = href.match(/\/artworks\/(\d+)/i) || href.match(/member_illust\.php\?.*illust_id=(\d+)/i) || href.match(/[?&]illust_id=(\d+)/i);
+        if (match) {
+            const illustId = match[1];
+            if (illustToUserMap.has(illustId)) {
+                return illustToUserMap.get(illustId);
+            }
+        }
+        return '';
     }
 
     function updateCountLabel(appliedCount) {
@@ -660,7 +802,7 @@
         }
 
         const targets = new Set(state.users);
-        const relatedNodes = relatedSection.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], [data-user-id]');
+        const relatedNodes = relatedSection.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], a[href*="/artworks/"], a[href*="member_illust.php"], [data-user-id]');
         let matchedCount = 0;
 
         relatedNodes.forEach((node) => {
@@ -721,14 +863,6 @@
         return null;
     }
 
-    function getUserIdFromElement(node) {
-        const direct = node.getAttribute('data-user-id') || node.getAttribute('data-user') || node.getAttribute('data-id');
-        if (direct) return String(direct).trim();
-        const href = node.getAttribute('href') || '';
-        const match = href.match(/\/users\/(\d+)/i) || href.match(/member\.php\?.*id=(\d+)/i) || href.match(/[?&]id=(\d+)/i);
-        return match ? match[1] : '';
-    }
-
     function findRelatedItemCard(node) {
         let closestCard = node;
         let current = node.parentElement;
@@ -767,7 +901,7 @@
 
     async function scanAndAutoSave() {
         if (!(/\/artworks\//.test(location.pathname) || /member_illust\.php/.test(location.pathname))) return;
-        const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], [data-user-id]'));
+        const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], a[href*="/artworks/"], a[href*="member_illust.php"], [data-user-id]'));
         let added = 0;
         for (const node of relatedNodes) {
             const userId = getUserIdFromElement(node);
