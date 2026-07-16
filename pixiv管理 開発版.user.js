@@ -1,10 +1,11 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.2
+// @name         Pixiv管理 開発版v4.0.3
 // @namespace    https://example.com/userscripts
-// @version      4.0.2
+// @version      4.0.3
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
+// @match        https://touch.pixiv.net/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -15,8 +16,8 @@
     const STORAGE_KEY = 'pixiv_follow_gray_users_v1';
     const DEFAULT_STATE = { enabled: true, users: [] };
     let state = loadState();
-    const IS_FOLLOWING_PAGE = /^\/users\/\d+\/following\/?$/.test(location.pathname);
-    const IS_USER_PAGE = /^\/users\/(\d+)\/?$/.test(location.pathname);
+    const IS_FOLLOWING_PAGE = /^\/users\/\d+\/following\/?$/.test(location.pathname) || (/^\/bookmark\.php$/.test(location.pathname) && /[?&]type=user/.test(location.search));
+    const IS_USER_PAGE = /^\/users\/(\d+)\/?$/.test(location.pathname) || (/^\/member\.php$/.test(location.pathname) && /[?&]id=\d+/.test(location.search));
     let observer = null;
     let scheduled = false;
     let userListSortOrder = 'asc';
@@ -28,6 +29,13 @@
     applyGrayStyle();
     showUserPageBadge();
     startObserver();
+
+    // Safety timer to guarantee periodic execution in mobile environment
+    setInterval(() => {
+        if (state.enabled && state.users.length) {
+            applyGrayStyle();
+        }
+    }, 1500);
 
     window.addEventListener('load', () => applyGrayStyle());
 
@@ -58,6 +66,15 @@
             .pixiv-follow-gray-target {
                 filter: grayscale(1) !important;
                 opacity: 0.6 !important;
+                will-change: filter, opacity;
+                transform: translateZ(0);
+                -webkit-transform: translateZ(0);
+            }
+            .pixiv-follow-gray-target img,
+            .pixiv-follow-gray-target picture,
+            .pixiv-follow-gray-target canvas,
+            .pixiv-follow-gray-target a {
+                filter: grayscale(1) !important;
             }
             #pixiv-follow-gray-settings {
                 position: fixed;
@@ -218,6 +235,9 @@
             }
             /* mobile tweaks */
             @media (max-width: 640px) {
+                #pixiv-follow-gray-settings {
+                    bottom: 80px !important; /* Avoid overlapping with mobile browser UI and Pixiv footer */
+                }
                 #pixiv-follow-gray-panel {
                     width: 90vw;
                     left: 5vw;
@@ -312,9 +332,16 @@
         document.body.appendChild(el);
         el.addEventListener('click', (ev) => {
             if (ev.target && ev.target.id === 'pixiv-follow-badge-delete') {
+                let userId = '';
                 const m = location.pathname.match(/^\/users\/(\d+)\/?$/);
                 if (m) {
-                    removeUserById(m[1]);
+                    userId = m[1];
+                } else {
+                    const searchParams = new URLSearchParams(location.search);
+                    userId = searchParams.get('id') || '';
+                }
+                if (userId) {
+                    removeUserById(userId);
                 }
             }
         });
@@ -324,9 +351,15 @@
         try {
             if (!IS_USER_PAGE) return;
             createUserPageBadge();
+            let userId = '';
             const m = location.pathname.match(/^\/users\/(\d+)\/?$/);
-            if (!m) return;
-            const userId = m[1];
+            if (m) {
+                userId = m[1];
+            } else {
+                const searchParams = new URLSearchParams(location.search);
+                userId = searchParams.get('id') || '';
+            }
+            if (!userId) return;
             const badge = document.getElementById('pixiv-follow-badge');
             if (!badge) return;
             // 表示条件: 記録済みユーザーであれば表示
@@ -615,7 +648,7 @@
     function applyGrayStyle() {
         removeGrayStyleFromAll();
 
-        if (!/\/artworks\//.test(location.pathname) || !state.enabled || !state.users.length) {
+        if (!(/\/artworks\//.test(location.pathname) || /member_illust\.php/.test(location.pathname)) || !state.enabled || !state.users.length) {
             updateCountLabel(0);
             return;
         }
@@ -627,7 +660,7 @@
         }
 
         const targets = new Set(state.users);
-        const relatedNodes = relatedSection.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]');
+        const relatedNodes = relatedSection.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], [data-user-id]');
         let matchedCount = 0;
 
         relatedNodes.forEach((node) => {
@@ -692,7 +725,7 @@
         const direct = node.getAttribute('data-user-id') || node.getAttribute('data-user') || node.getAttribute('data-id');
         if (direct) return String(direct).trim();
         const href = node.getAttribute('href') || '';
-        const match = href.match(/\/users\/(\d+)/i);
+        const match = href.match(/\/users\/(\d+)/i) || href.match(/member\.php\?.*id=(\d+)/i) || href.match(/[?&]id=(\d+)/i);
         return match ? match[1] : '';
     }
 
@@ -702,7 +735,7 @@
 
         while (current && current !== document.body) {
             // Find parent containing work link (works on both PC & mobile)
-            if (current.querySelector('a[href*="/artworks/"]')) {
+            if (current.querySelector('a[href*="/artworks/"]') || current.querySelector('a[href*="member_illust.php"]')) {
                 return current;
             }
             const media = Array.from(current.querySelectorAll('img, video, picture, canvas'));
@@ -733,8 +766,8 @@
     }
 
     async function scanAndAutoSave() {
-        if (!/\/artworks\//.test(location.pathname)) return;
-        const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], [data-user-id]'));
+        if (!(/\/artworks\//.test(location.pathname) || /member_illust\.php/.test(location.pathname))) return;
+        const relatedNodes = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="users/"], a[href*="member.php"], [data-user-id]'));
         let added = 0;
         for (const node of relatedNodes) {
             const userId = getUserIdFromElement(node);
@@ -813,7 +846,7 @@
     function markFollowingPageUsersApplied() {
         try {
             const targets = new Set(state.users || []);
-            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"]'));
+            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="member.php"]'));
             anchors.forEach((a) => {
                 const id = getUserIdFromElement(a);
                 if (!id) return;
@@ -849,7 +882,7 @@
     // フォロー一覧ページからユーザーIDを収集して保存する
     function importFromFollowingPage() {
         try {
-            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"]'));
+            const anchors = Array.from(document.querySelectorAll('a[href*="/users/"], a[href*="member.php"]'));
             const ids = anchors.map(getUserIdFromElement).filter(Boolean);
             if (!ids.length) return 0;
             const set = new Set(state.users || []);
