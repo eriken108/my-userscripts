@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.8
+// @name         Pixiv管理 開発版v4.0.9
 // @namespace    https://example.com/userscripts
-// @version      4.0.8
+// @version      4.0.9
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
@@ -341,8 +341,19 @@
                 padding: 8px !important;
                 box-sizing: border-box !important;
             }
-            /* Image adjustments */
-            .pixiv-mobile-layout-active main img {
+            /* First column (illustration container): Align everything to the left */
+            .pixiv-mobile-layout-active main > div > div:first-child {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+            }
+            /* Image alignments: Align to left */
+            .pixiv-mobile-layout-active main img,
+            .pixiv-mobile-layout-active main figure,
+            .pixiv-mobile-layout-active main [role="presentation"] {
+                margin: 0 !important;
+                margin-left: 0 !important;
+                justify-content: flex-start !important;
                 max-width: 100% !important;
                 height: auto !important;
                 object-fit: contain !important;
@@ -353,17 +364,17 @@
                 min-width: unset !important;
                 padding: 0 8px !important;
             }
-            /* Target grids to be 2 columns on mobile screens */
+            /* Target grids to be 3 columns on mobile screens */
             .pixiv-mobile-layout-active div[style*="grid-template-columns"], 
             .pixiv-mobile-layout-active ul[style*="grid-template-columns"] {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 8px !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 6px !important;
             }
-            /* Common Pixiv PC recommendation grid classes */
+            /* Common Pixiv PC recommendation grid classes to be 3 columns */
             .pixiv-mobile-layout-active [class*="Grid"], 
             .pixiv-mobile-layout-active [class*="grid"] {
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
-                gap: 8px !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 6px !important;
             }
         `;
         document.head.appendChild(style);
