@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pixiv管理 開発版v4.0.6
+// @name         Pixiv管理 開発版v4.0.7
 // @namespace    https://example.com/userscripts
-// @version      4.0.6
+// @version      4.0.7
 // @description  Pixiv の関連項目に表示される、設定したユーザーのサムネをグレー化します。右下に設定ボタンを追加します。
 // @match        https://www.pixiv.net/*
 // @match        https://pixiv.net/*
