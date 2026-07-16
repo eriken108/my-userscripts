@@ -1,12 +1,13 @@
 // ==UserScript==
-// @name         動画既読 安定版3.4.9
+// @name         動画既読 安定版3.5.0
 // @namespace    https://missav.ai/
-// @version      3.4.9
+// @version      3.5.0
 // @description  MissAVの動画ページで既読/お気に入りを保存し、関連動画だけにバッジを表示します。
 // @match        https://missav.ai/*
 // @match        https://*.missav.ai/*
 // @run-at       document-idle
 // @grant        none
+
 // ==/UserScript==
 
 (function () {
@@ -530,8 +531,9 @@
   }
 
   function getContentRoot() {
-    return [...document.querySelectorAll('div.content-without-search')]
+    const root = [...document.querySelectorAll('div.content-without-search')]
       .find((root) => root.querySelector('div.thumbnail.group'));
+    return root || document.body;
   }
 
   function getMainLayout() {
@@ -676,10 +678,9 @@
   }
 
   function setupControls() {
-    if (!isVideoPage()) return;
-
     const currentUrl = normalizeUrl(location.href);
-    if (!currentUrl) return;
+    const hasCards = document.querySelector('div.thumbnail.group') !== null;
+    if (!currentUrl && !hasCards) return;
 
     if (!document.getElementById(STATUS_BADGE_ID)) {
       const badgeContainer = document.createElement('div');
@@ -1054,7 +1055,8 @@
     const currentUrl = normalizeUrl(location.href);
     if (!controls) return;
 
-    if (!isVideoPage() || !currentUrl) {
+    const hasCards = document.querySelector('div.thumbnail.group') !== null;
+    if (!currentUrl && !hasCards) {
       controls.style.display = 'none';
       return;
     }
@@ -1066,7 +1068,7 @@
     const memoArea = controls.querySelector('[data-kind="memo"]');
     const statusBadge = document.getElementById(STATUS_BADGE_ID);
 
-    const state = videoData.get(currentUrl);
+    const state = currentUrl ? videoData.get(currentUrl) : null;
 
     // isVideoPageがtrueのときだけ表示
     const buttonGroup = document.getElementById('missav-rf-button-group');
@@ -1074,16 +1076,18 @@
         buttonGroup.style.display = 'flex';
     }
 
-    setButtonState(readButton, !!state, '既読');
-
-    if (memoArea) {
-      memoArea.style.display = state?.fav ? 'block' : 'none';
+    if (readButton) {
+      readButton.style.display = currentUrl ? 'block' : 'none';
+      setButtonState(readButton, !!state, '既読');
     }
 
-    setButtonState(favButton, !!state?.fav, 'お気に入り');
+    if (favButton) {
+      favButton.style.display = currentUrl ? 'block' : 'none';
+      setButtonState(favButton, !!state?.fav, 'お気に入り');
+    }
 
     if (memoArea) {
-      // 入力中の内容を上書きしないよう、フォーカス時は更新しない
+      memoArea.style.display = (currentUrl && state?.fav) ? 'block' : 'none';
       if (document.activeElement !== memoArea) {
         memoArea.value = state?.memo || '';
         adjustMemoHeight(memoArea);
@@ -1223,16 +1227,12 @@
   }
 
   function applyRelatedState() {
-    if (!isVideoPage()) return;
-
-    const containers = findRelatedContainers();
-    for (const container of containers) {
-      for (const card of getCards(container)) {
-        if (settings.showRelatedCards) {
-          applyCardState(card);
-        } else {
-          clearCardState(card);
-        }
+    const cards = document.querySelectorAll('div.thumbnail.group');
+    for (const card of cards) {
+      if (settings.showRelatedCards) {
+        applyCardState(card);
+      } else {
+        clearCardState(card);
       }
     }
   }
