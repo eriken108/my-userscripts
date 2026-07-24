@@ -1,9 +1,8 @@
 // ==UserScript==
-// @name         既読管理 安定版v5.3
+// @name         既読管理 安定版v5.3.1
 // @namespace    http://tampermonkey.net/
-// @version      5.3
+// @version      5.3.1
 // @description  既読 / 巡回中 / 未読 管理
-// @author       gpt5
 // @match        http://*/*
 // @match        https://*/*
 // @grant        GM_setValue
@@ -137,85 +136,106 @@
         }
 
         style.textContent = `
-            /* basic */
-            #read-marker-panel { color: #222; background-color: #fdfdfd; font-family: sans-serif; }
+            /* reset & scope UI panel styles against host website CSS */
+            #read-marker-panel, #read-marker-panel * {
+                box-sizing: border-box !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+                -webkit-text-fill-color: initial !important;
+                letter-spacing: normal !important;
+                text-shadow: none !important;
+            }
+
             #read-marker-toggle-button {
                 position: fixed; bottom: 15px; right: 15px; z-index: 99998;
-                width: 50px; height: 50px; color: white; border: none;
-                border-radius: 50%; font-size: 22px; line-height: 50px;
-                text-align: center; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                transition: transform 0.2s, background-color 0.2s;
-                background-color: ${DEFAULTS.UNREAD_COLOR};
+                width: 50px; height: 50px; color: white !important; border: none !important;
+                border-radius: 50% !important; font-size: 22px !important; line-height: 50px !important;
+                text-align: center !important; cursor: pointer !important; box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+                transition: transform 0.2s, background-color 0.2s !important;
+                background-color: ${DEFAULTS.UNREAD_COLOR} !important;
+                padding: 0 !important; margin: 0 !important;
             }
-            #read-marker-toggle-button.read { background-color: ${DEFAULTS.THEME_COLOR}; }
-            #read-marker-toggle-button.unread { background-color: ${DEFAULTS.UNREAD_COLOR}; }
-            #read-marker-toggle-button.inprogress { background-color: ${DEFAULTS.INPROGRESS_COLOR}; color:#222; }
-            #read-marker-toggle-button:hover { transform: scale(1.05); }
+            #read-marker-toggle-button.read { background-color: ${DEFAULTS.THEME_COLOR} !important; color: #ffffff !important; }
+            #read-marker-toggle-button.unread { background-color: ${DEFAULTS.UNREAD_COLOR} !important; color: #ffffff !important; }
+            #read-marker-toggle-button.inprogress { background-color: ${DEFAULTS.INPROGRESS_COLOR} !important; color:#222222 !important; }
+            #read-marker-toggle-button:hover { transform: scale(1.05) !important; }
 
             #read-marker-panel {
                 position: fixed; bottom: 80px; right: 15px; z-index: 99999;
                 width: 800px; height: ${currentPanelHeight}px;
-                background-color: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
-                box-shadow: 0 6px 20px rgba(0,0,0,0.18); display:flex; flex-direction:column;
+                background-color: #ffffff !important; color: #222222 !important;
+                border: 1px solid #e0e0e0 !important; border-radius: 8px !important;
+                box-shadow: 0 6px 20px rgba(0,0,0,0.18) !important; display:flex !important; flex-direction:column !important;
                 transform: translateY(20px); opacity: 0; pointer-events: none;
-                transition: opacity 0.25s, transform 0.25s, height 0.2s;
+                transition: opacity 0.25s, transform 0.25s, height 0.2s !important;
+                font-size: 13px !important; line-height: 1.4 !important; text-align: left !important;
             }
             #read-marker-panel.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
 
-            .rm-tabs { display:flex; border-bottom:1px solid #eee; }
-            .rm-tab-button { flex:1; padding:10px; background:#f7f7f7; border:none; cursor:pointer; font-size:13px; }
-            .rm-tab-button.active { background:#fff; font-weight:600; border-bottom:3px solid ${DEFAULTS.THEME_COLOR}; }
-            #list-count-display { font-size: 12px; color: #555; font-weight: normal; margin-left: 4px; }
+            #read-marker-panel h4 { margin: 10px 0 6px 0 !important; color: #222222 !important; font-size: 14px !important; font-weight: bold !important; }
+            #read-marker-panel p { margin: 4px 0 !important; color: #444444 !important; font-size: 13px !important; }
+            #read-marker-panel label { color: #333333 !important; font-size: 13px !important; display: inline-block !important; }
+            #read-marker-panel span { color: inherit; }
 
-            .rm-tab-content-wrapper { flex:1; overflow:auto; }
-            .rm-tab-content { display:none; padding:12px; }
-            .rm-tab-content.active { display:block; }
+            .rm-tabs { display:flex !important; border-bottom:1px solid #eee !important; background: #f7f7f7 !important; border-radius: 8px 8px 0 0 !important; }
+            .rm-tab-button { flex:1 !important; padding:10px !important; background:#f7f7f7 !important; color:#555555 !important; border:none !important; cursor:pointer !important; font-size:13px !important; font-weight: normal !important; text-align: center !important; }
+            .rm-tab-button.active { background:#ffffff !important; color:${DEFAULTS.THEME_COLOR} !important; font-weight:600 !important; border-bottom:3px solid ${DEFAULTS.THEME_COLOR} !important; }
+            #list-count-display { font-size: 12px !important; color: #666666 !important; font-weight: normal !important; margin-left: 4px !important; }
 
-            .rm-panel-footer { padding:10px; border-top:1px solid #eee; background:#fafafa; }
-            #current-page-status-button { width:100%; padding:8px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#fff; }
-            #current-page-status-button.read { background:${DEFAULTS.THEME_COLOR}; color:#fff; border-color:${DEFAULTS.THEME_COLOR}; }
-            #current-page-status-button.inprogress { background:${DEFAULTS.INPROGRESS_COLOR}; color:#222; border-color:${DEFAULTS.INPROGRESS_COLOR}; }
+            .rm-tab-content-wrapper { flex:1 !important; overflow:auto !important; background: #ffffff !important; }
+            .rm-tab-content { display:none; padding:12px !important; color: #222222 !important; }
+            .rm-tab-content.active { display:block !important; }
 
-            #read-marker-panel textarea, #read-marker-panel input[type="text"], #read-marker-panel input[type="file"] { color:#222; background:#fff; border:1px solid #ccc; }
-            #search-input { width:100%; padding:8px; margin-bottom:10px; border-radius:4px; box-sizing:border-box; }
-            #read-list-container { max-height: calc(${currentPanelHeight}px - 200px); overflow:auto; }
-            .list-item { padding:8px; border-bottom:1px solid #f0f0f0; display:block; position:relative; }
-            .list-item.current-page-highlight {
-                background-color: #f5eefc;
-                border-left: 4px solid ${DEFAULTS.THEME_COLOR};
-                padding-left: 4px;
+            .rm-panel-footer { padding:10px !important; border-top:1px solid #eee !important; background:#fafafa !important; border-radius: 0 0 8px 8px !important; }
+            #current-page-status-button { width:100% !important; padding:8px !important; cursor:pointer !important; border:1px solid #ccc !important; border-radius:4px !important; background:#ffffff !important; color: #333333 !important; font-size: 13px !important; text-align: center !important; }
+            #current-page-status-button.read { background:${DEFAULTS.THEME_COLOR} !important; color:#ffffff !important; border-color:${DEFAULTS.THEME_COLOR} !important; }
+            #current-page-status-button.inprogress { background:${DEFAULTS.INPROGRESS_COLOR} !important; color:#222222 !important; border-color:${DEFAULTS.INPROGRESS_COLOR} !important; }
+
+            #read-marker-panel textarea, #read-marker-panel input[type="text"], #read-marker-panel input[type="file"] {
+                color:#222222 !important; background:#ffffff !important; border:1px solid #ccc !important;
+                border-radius: 4px !important; padding: 6px 8px !important; font-size: 13px !important;
+                outline: none !important; box-shadow: none !important;
             }
-            .list-item .title { font-weight:700; margin-bottom:4px; word-break:break-all; cursor:pointer; }
-            .list-item .url { font-size:12px; color:#666; margin-bottom:4px; word-break:break-all; }
-            .list-item .date { font-size:11px; color:#999; margin-bottom:4px; }
-            .list-item .status-text { font-size:12px; color:#333; margin-bottom:6px; }
-            .list-item .comment-section { background:#f7f7f7; padding:6px 8px; border-left:3px solid #ddd; font-size:12px; white-space:pre-wrap; cursor:pointer; }
-            .list-item .actions { position:absolute; right:8px; top:8px; }
-            .action-button { border:none; background:none; cursor:pointer; padding:4px 6px; font-size:14px; color:#666; }
-            .action-button:hover { color:#222; }
+            #search-input { width:100% !important; padding:8px !important; margin-bottom:10px !important; border-radius:4px !important; box-sizing:border-box !important; }
+            #read-list-container { max-height: calc(${currentPanelHeight}px - 200px) !important; overflow:auto !important; }
+            .list-item { padding:8px !important; border-bottom:1px solid #f0f0f0 !important; display:block !important; position:relative !important; background: #ffffff !important; color: #222222 !important; }
+            .list-item.current-page-highlight {
+                background-color: #f5eefc !important;
+                border-left: 4px solid ${DEFAULTS.THEME_COLOR} !important;
+                padding-left: 4px !important;
+            }
+            .list-item .title { font-weight:700 !important; color: #1a0dab !important; margin-bottom:4px !important; word-break:break-all !important; cursor:pointer !important; font-size: 14px !important; }
+            .list-item .url { font-size:12px !important; color:#006621 !important; margin-bottom:4px !important; word-break:break-all !important; }
+            .list-item .date { font-size:11px !important; color:#888888 !important; margin-bottom:4px !important; }
+            .list-item .status-text { font-size:12px !important; color:#333333 !important; margin-bottom:6px !important; }
+            .list-item .comment-section { background:#f7f7f7 !important; color:#333333 !important; padding:6px 8px !important; border-left:3px solid #ddd !important; border-radius: 2px !important; font-size:12px !important; white-space:pre-wrap !important; cursor:pointer !important; }
+            .list-item .actions { position:absolute !important; right:8px !important; top:8px !important; }
+            .action-button { border:none !important; background:none !important; cursor:pointer !important; padding:4px 6px !important; font-size:14px !important; color:#666666 !important; }
+            .action-button:hover { color:#222222 !important; }
 
-            .setting-section { margin-bottom:14px; }
-            .setting-button { padding:6px 10px; border:1px solid #ccc; border-radius:4px; background:#f0f0f0; cursor:pointer; margin-right:6px; }
+            .setting-section { margin-bottom:14px !important; }
+            .setting-button { padding:6px 10px !important; border:1px solid #ccc !important; border-radius:4px !important; background:#f0f0f0 !important; color:#333333 !important; cursor:pointer !important; margin-right:6px !important; font-size: 13px !important; }
+            .setting-button:hover { background: #e4e4e4 !important; }
 
             ${readLinkCss}
+
             .tampermonkey-inprogress-link { color: ${DEFAULTS.INPROGRESS_COLOR} !important; font-weight:700 !important; text-decoration: underline dotted !important; }
 
             #read-marker-badge {
                 position: fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:100000;
                 display:none; align-items:center; justify-content:center; min-height:${badgeSize}px;
                 padding:${badgePadding}px ${Math.round(badgePadding*1.6)}px; border-radius:${Math.round(badgeSize*0.18)}px;
-                background:${DEFAULTS.THEME_COLOR}; color:#fff; font-weight:700; font-size:${badgeFontSize}px;
-                box-shadow: 0 6px 18px rgba(0,0,0,0.25); pointer-events:none; white-space:nowrap;
+                background:${DEFAULTS.THEME_COLOR} !important; color:#ffffff !important; font-weight:700 !important; font-size:${badgeFontSize}px;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.25) !important; pointer-events:none; white-space:nowrap;
             }
-            #read-marker-badge.show { display:flex; }
+            #read-marker-badge.show { display:flex !important; }
 
-            /* list filter buttons (一覧タブ右) */
-            #list-filter-buttons { display:flex; gap:6px; align-items:center; margin-left:8px; }
+            /* list filter buttons */
+            #list-filter-buttons { display:flex !important; gap:6px !important; align-items:center !important; margin-left:8px !important; }
             .filter-button {
-                padding:6px 10px; border-radius:6px; border:1px solid #ddd; background:#fafafa;
-                cursor:pointer; font-size:13px;
+                padding:6px 10px !important; border-radius:6px !important; border:1px solid #ddd !important; background:#fafafa !important; color: #444444 !important;
+                cursor:pointer !important; font-size:13px !important;
             }
-            .filter-button.active { background:${DEFAULTS.THEME_COLOR}; color:#fff; border-color:${DEFAULTS.THEME_COLOR}; font-weight:600; }
+            .filter-button.active { background:${DEFAULTS.THEME_COLOR} !important; color:#ffffff !important; border-color:${DEFAULTS.THEME_COLOR} !important; font-weight:600 !important; }
         `;
         document.head.appendChild(style);
     };
